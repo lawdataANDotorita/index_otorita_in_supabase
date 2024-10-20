@@ -135,3 +135,4 @@ for idx in range(current_index+1, end_index):
         f.write(str(current_index))
 
 
+#now it's supabase time
