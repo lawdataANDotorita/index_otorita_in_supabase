@@ -1,3 +1,4 @@
+from openai import OpenAI
 import pandas as pd
 import os
 import requests
@@ -15,6 +16,24 @@ def create_chunks(sentences, chunk_size, overlap):
                 'vector': None,
             })
     return chunks
+
+
+def get_embedding(text):
+    response = openai_client.embeddings.create(
+        input=text,
+        model="text-embedding-ada-002"  # This is the recommended model for embeddings
+    )
+    return response.data[0].embedding
+
+# Path to the open_ai_key.txt file
+open_ai_key_path = os.path.join(current_dir, 'open_ai_key.txt')
+
+# Read the OpenAI key from the file
+with open(open_ai_key_path, 'r') as f:
+    open_ai_key = f.read().strip()
+
+# Initialize the OpenAI client with the key
+openai_client = OpenAI(api_key=open_ai_key)
 
 # how many documents to process in each batch
 batch_size = 10
@@ -108,6 +127,7 @@ for idx in range(current_index+1, end_index):
 
     # Print the chunks for verification
     for i, chunk in enumerate(chunks):
+        chunk["vector"]=get_embedding(chunk["chunk"])
         print(f"Chunk {i + 1}:\n{chunk['chunk']} and vector is {chunk['vector']}\n")
 
     # Write the updated current_index to the file
