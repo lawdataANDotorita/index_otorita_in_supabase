@@ -4,6 +4,8 @@ import os
 import requests
 from bs4 import BeautifulSoup
 import re
+from supabase import create_client, Client
+import time
 
 # Function to create overlapping chunks
 def create_chunks(sentences, chunk_size, overlap):
@@ -25,6 +27,9 @@ def get_embedding(text):
     )
     return response.data[0].embedding
 
+# Get the current directory
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
 # Path to the open_ai_key.txt file
 open_ai_key_path = os.path.join(current_dir, 'open_ai_key.txt')
 
@@ -36,10 +41,11 @@ with open(open_ai_key_path, 'r') as f:
 openai_client = OpenAI(api_key=open_ai_key)
 
 # how many documents to process in each batch
-batch_size = 10
+batch_size = 100
 
-# Get the current directory
-current_dir = os.path.dirname(os.path.abspath(__file__))
+url: str = "https://rmigfbegvrilgentysif.supabase.co"
+key: str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJtaWdmYmVndnJpbGdlbnR5c2lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mjk0MzEwMjMsImV4cCI6MjA0NTAwNzAyM30.S3HRecwWknLROuORA_nfOlizw5VFOeHp01ku3Y8f89M"
+supabase: Client = create_client(url, key)
 
 # Construct the full path to the Excel file
 excel_path = os.path.join(current_dir, 'data.xlsx')
@@ -54,7 +60,7 @@ data_rows = []
 for index, row in df.iterrows():
     data_row = {
         'doc_rel_index': row[0],
-        'doc_db_name': row[1],
+        'doc_db_index': row[1],
         'doc_file_name': row[2]
     }
     data_rows.append(data_row)
@@ -84,6 +90,9 @@ if current_index == len(data_rows) - 1:
 # Determine the end index for the range
 end_index = min(len(data_rows), current_index + 1 + batch_size)
 for idx in range(current_index+1, end_index):
+    
+    time.sleep(2)
+    
     print(f"{idx}");
     current_index=idx
 
@@ -127,8 +136,30 @@ for idx in range(current_index+1, end_index):
 
     # Print the chunks for verification
     for i, chunk in enumerate(chunks):
-        chunk["vector"]=get_embedding(chunk["chunk"])
+
+        try:
+            #get openai embedding
+            chunk["vector"]=get_embedding(chunk["chunk"])
+            
+            # Insert data into the document table
+            response = supabase.table('documents').insert({
+                "content": chunk["chunk"],
+                "index_in_db": data_rows[current_index]['doc_db_index'],
+                "embedding": chunk["vector"],
+            }).execute()
+
+            # Check if the response contains errors
+            if hasattr(response, 'error') and response.error:
+                print(f"Error: {response.error}")
+            else:
+                print(f"Inserted {len(response.data)} row(s)")
+                print(f"Response data: {response.data}")
+
+        except Exception as e:
+            print(f"An error occurred: {e}")
+
         print(f"Chunk {i + 1}:\n{chunk['chunk']} and vector is {chunk['vector']}\n")
+
 
     # Write the updated current_index to the file
     with open(index_file_path, 'w') as f:
