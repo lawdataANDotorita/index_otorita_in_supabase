@@ -134,32 +134,33 @@ for idx in range(current_index+1, end_index):
     # Create chunks with 5 sentences each and 1 sentence overlap
     chunks = create_chunks(sentences, 5, 1)
 
+    chunks_with_vectors = []
     # Print the chunks for verification
     for i, chunk in enumerate(chunks):
+        chunk["vector"]=get_embedding(chunk["chunk"])
+        chunks_with_vectors.append({
+            "content": chunk["chunk"],
+            "index_in_db": data_rows[current_index]['doc_db_index'],
+            "embedding": chunk["vector"],
+        })
 
-        try:
-            #get openai embedding
-            chunk["vector"]=get_embedding(chunk["chunk"])
-            
-            # Insert data into the document table
-            response = supabase.table('documents').insert({
-                "content": chunk["chunk"],
-                "index_in_db": data_rows[current_index]['doc_db_index'],
-                "embedding": chunk["vector"],
-            }).execute()
 
-            # Check if the response contains errors
-            if hasattr(response, 'error') and response.error:
-                print(f"Error: {response.error}")
-            else:
-                print(f"Inserted {len(response.data)} row(s)")
-                print(f"Response data: {response.data}")
 
-        except Exception as e:
-            print(f"An error occurred: {e}")
+    try:
+        #get openai embedding
+        
+        # Insert data into the document table
+        response = supabase.table('documents').insert(chunks_with_vectors).execute()
 
-        print(f"Chunk {i + 1}:\n{chunk['chunk']} and vector is {chunk['vector']}\n")
+        # Check if the response contains errors
+        if hasattr(response, 'error') and response.error:
+            print(f"Error: {response.error}")
+        else:
+            print(f"Inserted {len(response.data)} row(s)")
+            print(f"Response data: {response.data}")
 
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
     # Write the updated current_index to the file
     with open(index_file_path, 'w') as f:

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Query Database</title>
+    <Style>
+        body{
+            direction:rtl;
+        }
+        #eQueryResults>.itm{
+            margin:1rem;
+        }
+    </Style>
+</head>
+<body>
+    <header>
+        <h1>אוטוריטה - חיפוש חדש</h1>
+    </header>
+    <main>
+        <div id="eQueryForm" >
+            <label for="query">הזן את השאילתה שלך בשפה חופשית:</label>
+            <input type="text" id="query" name="query" required>
+            <button onclick="submitQuery()">שליחה</button>
+        </div>
+        <div id="eQueryResults">
+
+        </div>
+    </main>
+    <script>
+        function submitQuery() {
+                const query = document.getElementById('query').value;
+                fetch('https://client.shaiz2206.workers.dev', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ query: query })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    const eQueryResults = document.getElementById('eQueryResults');
+                    eQueryResults.innerHTML = ''; // Clear previous results
+
+                    data.chunks.forEach(item => {
+                        const div = document.createElement('div');
+                        div.className = 'itm';
+                        div.innerText = item;
+                        eQueryResults.appendChild(div);
+                    });
+                    const div = document.createElement('div');
+                    div.className = 'itm';
+                    div.innerText = data.answer;
+                    eQueryResults.appendChild(div);
+
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+            }
+
+    </script>
+    
+</body>
+</html>
