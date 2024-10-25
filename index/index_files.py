@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 import re
 from supabase import create_client, Client
 import time
+import sys
 
 # Function to create overlapping chunks
 def create_chunks(sentences, chunk_size, overlap):
@@ -49,7 +50,7 @@ with open(open_ai_key_path, 'r') as f:
 openai_client = OpenAI(api_key=open_ai_key)
 
 # how many documents to process in each batch
-batch_size = 100
+batch_size = 1000
 
 url: str = "https://rmigfbegvrilgentysif.supabase.co"
 key: str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJtaWdmYmVndnJpbGdlbnR5c2lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mjk0MzEwMjMsImV4cCI6MjA0NTAwNzAyM30.S3HRecwWknLROuORA_nfOlizw5VFOeHp01ku3Y8f89M"
@@ -104,61 +105,70 @@ for idx in range(current_index+1, end_index):
     local_addr=f"C:\\Users\\shay\\alltmp\\otorita_pages_query\\Query\\{data_rows[current_index]['doc_file_name']}.html"
 
     # Open the local document file
-    with open(local_addr, 'r', encoding='windows-1255') as f:
-        document_content = f.read()
-
-
-    # Parse the HTML content
-    soup = BeautifulSoup(document_content, 'html.parser')
-
-    # Extract text from the HTML
-    document_text = soup.get_text()
-
-    lines = document_text.split('\n')
-        
-    # Remove empty lines or lines with only whitespace
-    cleaned_lines = [line.strip() for line in lines if line.strip()]
-
-    # Join the non-empty lines back together
-    document_text = '\n'.join(cleaned_lines)
-
-
-    # Split the document text into sentences
-    sentences = re.split(r'(?<=[.!?;])\s+', document_text)
-
-    # Create chunks with 5 sentences each and 1 sentence overlap
-    chunks = create_chunks(sentences, 5, 1)
-
-    chunks_with_vectors = []
-    # Print the chunks for verification
-    for i, chunk in enumerate(chunks):
-        chunk["vector"]=get_embedding(chunk["chunk"])
-        chunks_with_vectors.append({
-            "content": chunk["chunk"],
-            "index_in_db": data_rows[current_index]['doc_db_index'],
-            "embedding": chunk["vector"],
-        })
-
-
-
+    to_continue=True
     try:
-        #get openai embedding
-        
-        # Insert data into the document table
-        response = supabase.table('documents').insert(chunks_with_vectors).execute()
-
-        # Check if the response contains errors
-        if hasattr(response, 'error') and response.error:
-            print(f"Error: {response.error}")
-        else:
-            print(f"Inserted {len(response.data)} row(s)")
+        with open(local_addr, 'r', encoding='windows-1255') as f:
+            document_content = f.read()
 
     except Exception as e:
         print(f"An error occurred: {e}")
+        to_continue=False
 
-    # Write the updated current_index to the file
-    with open(index_file_path, 'w') as f:
-        f.write(str(current_index))
+    if to_continue:
+        # Parse the HTML content
+        soup = BeautifulSoup(document_content, 'html.parser')
+
+        # Extract text from the HTML
+        document_text = soup.get_text()
+
+        lines = document_text.split('\n')
+            
+        # Remove empty lines or lines with only whitespace
+        cleaned_lines = [line.strip() for line in lines if line.strip()]
+
+        # Join the non-empty lines back together
+        document_text = '\n'.join(cleaned_lines)
 
 
-#now it's supabase time
+        # Split the document text into sentences
+        sentences = re.split(r'(?<=[.!?;])\s+', document_text)
+
+        # Create chunks with 5 sentences each and 1 sentence overlap
+        chunks = create_chunks(sentences, 5, 1)
+
+        chunks_with_vectors = []
+        # Print the chunks for verification
+        for i, chunk in enumerate(chunks):
+            try:
+                chunk["vector"]=get_embedding(chunk["chunk"])
+            except Exception as e:
+                print(f"An error occurred: {e}")
+                chunk["vector"]=None
+            chunks_with_vectors.append({
+                "content": chunk["chunk"],
+                "index_in_db": data_rows[current_index]['doc_db_index'],
+                "embedding": chunk["vector"],
+            })
+
+
+
+        try:
+            #get openai embedding
+            
+            # Insert data into the document table
+            response = supabase.table('documents').insert(chunks_with_vectors).execute()
+
+            # Check if the response contains errors
+            if hasattr(response, 'error') and response.error:
+                print(f"Error: {response.error}")
+            else:
+                print(f"Inserted {len(response.data)} row(s)")
+
+        except Exception as e:
+            print(f"An error occurred: {e}")
+
+        # Write the updated current_index to the file
+        with open(index_file_path, 'w') as f:
+            f.write(str(current_index))
+
+
