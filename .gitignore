@@ -1,2 +1,7 @@
 open_ai_key.txt
 current_index.txt
+index/build/
+index/dist/
+*.xlsx
+*.exe
+*.spec

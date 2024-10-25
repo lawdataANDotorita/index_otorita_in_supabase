@@ -12,13 +12,21 @@ def create_chunks(sentences, chunk_size, overlap):
     chunks = []
     for i in range(0, len(sentences), chunk_size - overlap):
         chunk = sentences[i:i + chunk_size]
-        if len(chunk) == chunk_size:
-            chunks.append({
-                'chunk':' '.join(chunk),
-                'vector': None,
-            })
+        chunks.append({
+            'chunk':' '.join(chunk),
+            'vector': None,
+        })
     return chunks
 
+def get_exe_directory():
+    # When running as exe, this gets the exe's directory
+    # When running as script, gets the script's directory
+    if getattr(sys, 'frozen', False):
+        # Running as executable
+        return os.path.dirname(sys.executable)
+    else:
+        # Running as script
+        return os.path.dirname(os.path.abspath(__file__))
 
 def get_embedding(text):
     response = openai_client.embeddings.create(
@@ -28,7 +36,7 @@ def get_embedding(text):
     return response.data[0].embedding
 
 # Get the current directory
-current_dir = os.path.dirname(os.path.abspath(__file__))
+current_dir = get_exe_directory()
 
 # Path to the open_ai_key.txt file
 open_ai_key_path = os.path.join(current_dir, 'open_ai_key.txt')
@@ -71,10 +79,7 @@ index_file_path = os.path.join(current_dir, 'current_index.txt')
 
 # Check if the file exists
 if not os.path.exists(index_file_path):
-    # Create the file and write 0 to it
-    with open(index_file_path, 'w') as f:
-        f.write('-1')
-    current_index = -1
+    print("The current_index.txt file does not exist. if you're starting a new index process then create one and put the value -1 in it. if you're continuing from a previous index process then find the lost current_index.txt file.")
 else:
     # Read the current index from the file
     with open(index_file_path, 'r') as f:
@@ -91,26 +96,16 @@ if current_index == len(data_rows) - 1:
 end_index = min(len(data_rows), current_index + 1 + batch_size)
 for idx in range(current_index+1, end_index):
     
-    time.sleep(2)
+    time.sleep(0.5)
     
     print(f"{idx}");
     current_index=idx
 
-    remote_addr=f"https://otorita.net/otoritadb/pages/query/{data_rows[current_index]['doc_file_name']}.html"
+    local_addr=f"C:\\Users\\shay\\alltmp\\otorita_pages_query\\Query\\{data_rows[current_index]['doc_file_name']}.html"
 
-
-    # Fetch the document from the remote address
-    response = requests.get(remote_addr)
-    # Fetch the document from the remote address with windows-1255 encoding
-    response.encoding = 'windows-1255'
-    # Check if the request was successful
-    if response.status_code == 200:
-        document_content = response.text
-        # Convert the document content from windows-1255 to utf-8 encoding
-        print("Document fetched successfully.")
-    else:
-        document_content = "err"
-        print(f"Failed to fetch document. Status code: {response.status_code}")
+    # Open the local document file
+    with open(local_addr, 'r', encoding='windows-1255') as f:
+        document_content = f.read()
 
 
     # Parse the HTML content
@@ -157,7 +152,6 @@ for idx in range(current_index+1, end_index):
             print(f"Error: {response.error}")
         else:
             print(f"Inserted {len(response.data)} row(s)")
-            print(f"Response data: {response.data}")
 
     except Exception as e:
         print(f"An error occurred: {e}")
