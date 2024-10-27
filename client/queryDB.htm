@@ -8,19 +8,46 @@
         body{
             direction:rtl;
         }
+        body,input,button{
+            font-family:arial;
+            font-size:1rem;
+        }
         #eQueryResults>.itm{
-            margin:1rem;
+            padding:1rem;
+            margin:1rem 0;
+            border:1px solid black;
+        }
+        #eQueryResults>.answer{
+            margin:1rem 0;
+            color:red;
+        }
+        header{
+            text-align:center;
+        }
+        main{
+            width:980px;
+            margin:auto;
+        }
+        #eQueryForm{
+            display:flex;
+            flex-wrap:wrap;
+            gap:0.5rem;
+        }
+        #query{
+            flex-grow:1;
+        }
+        .hideMe{
+            display:none;
         }
     </Style>
 </head>
 <body>
     <header>
-        <h1>אוטוריטה - חיפוש חדש</h1>
+        <h1>אוטוריטה - חיפוש בשפה טבעית</h1>
     </header>
     <main>
         <div id="eQueryForm" >
-            <label for="query">הזן את השאילתה שלך בשפה חופשית:</label>
-            <input type="text" id="query" name="query" required>
+            <input type="text" id="query" name="query" required placeholder="מה תרצה/י לדעת ?">
             <button onclick="submitQuery()">שליחה</button>
         </div>
         <div id="eQueryResults">
@@ -30,6 +57,7 @@
     <script>
         function submitQuery() {
                 const query = document.getElementById('query').value;
+                eQueryResults.innerHTML = ''; // Clear previous results
                 fetch('https://client.shaiz2206.workers.dev', {
                     method: 'POST',
                     headers: {
@@ -40,18 +68,26 @@
                 .then(response => response.json())
                 .then(data => {
                     const eQueryResults = document.getElementById('eQueryResults');
-                    eQueryResults.innerHTML = ''; // Clear previous results
-
+                    const div = document.createElement('div');
+                    div.className = 'answer';
+                    div.innerText = data.answer;
+                    eQueryResults.appendChild(div);
+                    const sourceButton = document.createElement('button');
+                    sourceButton.innerText = 'למקורות';
+                    sourceButton.onclick = () => {
+                        document.querySelectorAll('.itm').forEach(item => {
+                            item.classList.toggle('hideMe');
+                        });
+                    };
+                    eQueryResults.appendChild(sourceButton);
+                    
                     data.chunks.forEach(item => {
                         const div = document.createElement('div');
-                        div.className = 'itm';
+                        div.className = 'itm hideMe';
                         div.innerText = item;
                         eQueryResults.appendChild(div);
                     });
-                    const div = document.createElement('div');
-                    div.className = 'itm';
-                    div.innerText = data.answer;
-                    eQueryResults.appendChild(div);
+                    
 
                 })
                 .catch(error => {

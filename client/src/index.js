@@ -50,6 +50,7 @@ export default {
 		if (!url) throw new Error(`Expected env var SUPABASE_URL`);
 		const supabase = createClient(url, privateKey);
 
+		const results={};
 
 		const { data,error } = await supabase.rpc('match_documents', {
 			query_embedding: Array.from(messages.vector),
@@ -58,9 +59,8 @@ export default {
 		});
 
 		if (error) {
-			messages.error=error;
+			results.error=error;
 		}
-		const results={};
 
 		let allParagraphsFoundConcat="";
 
@@ -75,7 +75,7 @@ export default {
 		];
 
 		const chatCompletion = await oOpenAi.chat.completions.create({
-			model: 'gpt-4o-mini',
+			model: 'gpt-4o',
 			messages:messagesForOpenAI,
 			temperature: 1.1,
 			presence_penalty: 0,
