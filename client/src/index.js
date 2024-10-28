@@ -30,12 +30,33 @@ export default {
 			apiKey:env.OPENAI_API_KEY,
 			baseURL:"https://gateway.ai.cloudflare.com/v1/1719b913db6cbf5b9e3267b924244e58/query_db_gateway/openai"
 		});
+		var messagesForOpenAI;
+		var response;
+		var chatCompletion;
+		const results={};
+		
+		//here call openai to transform your query to a more structured query
+		messagesForOpenAI = [
+			{ role: 'system', content: "אתה מומחה לדיני עבודה ועליך להרכיב לי מהשאלה שתקבל בשאילתה הבאה את השאילתה שתאפשר לך לענות בצורה הטובה ביותר על השאלה המקורית. תשכתב את השאלה בלבד, בלי הקדמות וסיומות. תודה: "},
+			{ role: 'user', content: messages.query }
+		];
 
+		chatCompletion = await oOpenAi.chat.completions.create({
+			model: 'gpt-4o',
+			messages:messagesForOpenAI,
+			temperature: 1.1,
+			presence_penalty: 0,
+			frequency_penalty: 0
+		})
+		response = chatCompletion.choices[0].message;
+		const newQuery=response.content;
+
+		results.newQuery=newQuery;
 		
 		try {
-			const response = await oOpenAi.embeddings.create({
+			  response = await oOpenAi.embeddings.create({
 			  model: "text-embedding-ada-002",
-			  input: messages.query
+			  input: newQuery
 			});
 			messages.vector = response.data[0].embedding;
 		} 
@@ -49,8 +70,6 @@ export default {
 
 		if (!url) throw new Error(`Expected env var SUPABASE_URL`);
 		const supabase = createClient(url, privateKey);
-
-		const results={};
 
 		const { data,error } = await supabase.rpc('match_documents', {
 			query_embedding: Array.from(messages.vector),
@@ -69,19 +88,19 @@ export default {
 			allParagraphsFoundConcat=data.map(item => item.content).join(' ')
 		}
 
-		const messagesForOpenAI = [
+		messagesForOpenAI = [
 			{ role: 'system', content: "אתה מומחה משפטי לדיני עבודה. אתה צריך לקבל את הפסקאות הבאות ולענות רק באמצעותן על השאלה שתופיע בשאילתה הבאה. הפסקאות הן: "+allParagraphsFoundConcat },
-			{ role: 'user', content: messages.query }
+			{ role: 'user', content: newQuery }
 		];
 
-		const chatCompletion = await oOpenAi.chat.completions.create({
+		chatCompletion = await oOpenAi.chat.completions.create({
 			model: 'gpt-4o',
 			messages:messagesForOpenAI,
 			temperature: 1.1,
 			presence_penalty: 0,
 			frequency_penalty: 0
 		})
-		const response = chatCompletion.choices[0].message;
+		response = chatCompletion.choices[0].message;
 
 		results.answer=response.content;
 

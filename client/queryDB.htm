@@ -8,7 +8,7 @@
         body{
             direction:rtl;
         }
-        body,input,button{
+        body,input,button,textarea{
             font-family:arial;
             font-size:1rem;
         }
@@ -19,7 +19,7 @@
         }
         #eQueryResults>.answer{
             margin:1rem 0;
-            color:red;
+            color:#465a72;
         }
         header{
             text-align:center;
@@ -32,9 +32,15 @@
             display:flex;
             flex-wrap:wrap;
             gap:0.5rem;
+            align-items:flex-end;
         }
-        #query{
+        #eQuery{
             flex-grow:1;
+            padding:0.5rem;
+            
+        }
+        #eSend{
+            padding:0.5rem;
         }
         .hideMe{
             display:none;
@@ -47,8 +53,8 @@
     </header>
     <main>
         <div id="eQueryForm" >
-            <input type="text" id="query" name="query" required placeholder="מה תרצה/י לדעת ?">
-            <button onclick="submitQuery()">שליחה</button>
+            <textarea id="eQuery" name="query" required placeholder="מה תרצה/י לדעת ?" rows="5"></textarea>
+            <button id="eSend" onclick="submitQuery()">שליחה</button>
         </div>
         <div id="eQueryResults">
 
@@ -56,7 +62,7 @@
     </main>
     <script>
         function submitQuery() {
-                const query = document.getElementById('query').value;
+                const query = document.getElementById('eQuery').value;
                 eQueryResults.innerHTML = ''; // Clear previous results
                 fetch('https://client.shaiz2206.workers.dev', {
                     method: 'POST',
