@@ -1,12 +1,8 @@
-/**
- * Welcome to Cloudflare Workers! This is your first worker.
- *
- * - Run `npm run dev` in your terminal to start a development server
- * - Open a browser tab at http://localhost:8787/ to see your worker in action
- * - Run `npm run deploy` to publish your worker
- *
- * Learn more at https://developers.cloudflare.com/workers/
- */
+/*
+
+#1 - shay - 29/10/2024 - leave the user's query optimization out for now. it seems to confuse the embedding model
+
+*/
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 
@@ -41,6 +37,8 @@ export default {
 			{ role: 'user', content: messages.query }
 		];
 
+//#1
+/*		
 		chatCompletion = await oOpenAi.chat.completions.create({
 			model: 'gpt-4o',
 			messages:messagesForOpenAI,
@@ -50,6 +48,8 @@ export default {
 		})
 		response = chatCompletion.choices[0].message;
 		const newQuery=response.content;
+*/
+		const newQuery=messages.query;
 
 		results.newQuery=newQuery;
 		
@@ -74,7 +74,7 @@ export default {
 		const { data,error } = await supabase.rpc('match_documents', {
 			query_embedding: Array.from(messages.vector),
 			match_threshold: 0.8,
-			match_count: 10
+			match_count: 5
 		});
 
 		if (error) {
@@ -84,8 +84,7 @@ export default {
 		let allParagraphsFoundConcat="";
 
 		if (data) {
-			results.chunks = data.map(item => {return {content:item.content,index_in_db:item.index_in_db};});
-			results.indexes_in_db = data.map(item => item.index_in_db);
+			results.chunks = data.map(item => {return {content:item.content,index_in_db:item.index_in_db,similarity:item.similarity};});
 			allParagraphsFoundConcat=data.map(item => item.content).join(' ')
 		}
 
