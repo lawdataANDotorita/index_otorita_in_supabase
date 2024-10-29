@@ -15,7 +15,21 @@
         #eQueryResults>.itm{
             padding:1rem;
             margin:1rem 0;
-            border:1px solid black;
+            border:1px solid #aaa;
+            display:flex;
+            flex-direction: column;
+            align-items:flex-end;
+
+        }
+        #eQueryResults>.itm>.content{
+            color:#465a72;
+            width:100%;
+        }
+        #eQueryResults>.itm>.linkBtn{
+            color:#465a72;
+            cursor:pointer;
+            text-decoration:underline;
+            margin-top:0.5rem;
         }
         #eQueryResults>.answer{
             margin:1rem 0;
@@ -43,7 +57,7 @@
             padding:0.5rem;
         }
         .hideMe{
-            display:none;
+            display:none !important;
         }
     </Style>
 </head>
@@ -62,6 +76,7 @@
     </main>
     <script>
         function submitQuery() {
+                document.querySelector("#eSend").disabled=true;
                 const query = document.getElementById('eQuery').value;
                 eQueryResults.innerHTML = ''; // Clear previous results
                 fetch('https://client.shaiz2206.workers.dev', {
@@ -90,8 +105,22 @@
                     data.chunks.forEach(item => {
                         const div = document.createElement('div');
                         div.className = 'itm hideMe';
-                        div.innerText = item;
+
+
+                        const eContent=document.createElement('div');
+                        eContent.classList.add("content");
+                        eContent.innerHTML=item.content;
+                        div.appendChild(eContent);
+
+                        const eLinkBtn=document.createElement('div');
+                        eLinkBtn.classList.add("linkBtn");
+                        eLinkBtn.innerHTML="לפרסום";
+                        eLinkBtn.onclick=()=>{
+                            window.open("https://otorita.net/otorita_test/getDocByIndx.asp?c="+item.index_in_db);
+                        };
+                        div.appendChild(eLinkBtn);
                         eQueryResults.appendChild(div);
+                        document.querySelector("#eSend").disabled=false;
                     });
                     
 

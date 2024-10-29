@@ -73,8 +73,8 @@ export default {
 
 		const { data,error } = await supabase.rpc('match_documents', {
 			query_embedding: Array.from(messages.vector),
-			match_threshold: 0.5,
-			match_count: 5
+			match_threshold: 0.8,
+			match_count: 10
 		});
 
 		if (error) {
@@ -84,7 +84,8 @@ export default {
 		let allParagraphsFoundConcat="";
 
 		if (data) {
-			results.chunks = data.map(item => item.content);
+			results.chunks = data.map(item => {return {content:item.content,index_in_db:item.index_in_db};});
+			results.indexes_in_db = data.map(item => item.index_in_db);
 			allParagraphsFoundConcat=data.map(item => item.content).join(' ')
 		}
 
