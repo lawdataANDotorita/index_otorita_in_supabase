@@ -2,6 +2,9 @@ open_ai_key.txt
 current_index.txt
 index/build/
 index/dist/
+otorita_pages_query/
 *.xlsx
 *.exe
 *.spec
+node_modules/
+*.json

@@ -7,6 +7,8 @@ import re
 from supabase import create_client, Client
 import time
 import sys
+# from langchain.text_splitter import RecursiveCharacterTextSplitter
+
 
 # Function to create overlapping chunks
 def create_chunks(sentences, chunk_size, overlap):
@@ -32,7 +34,7 @@ def get_exe_directory():
 def get_embedding(text):
     response = openai_client.embeddings.create(
         input=text,
-        model="text-embedding-ada-002"  # This is the recommended model for embeddings
+        model="text-embedding-3-large"  # This is the recommended model for embeddings
     )
     return response.data[0].embedding
 
@@ -50,7 +52,7 @@ with open(open_ai_key_path, 'r') as f:
 openai_client = OpenAI(api_key=open_ai_key)
 
 # how many documents to process in each batch
-batch_size = 1000
+batch_size = 6693
 
 url: str = "https://rmigfbegvrilgentysif.supabase.co"
 key: str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJtaWdmYmVndnJpbGdlbnR5c2lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mjk0MzEwMjMsImV4cCI6MjA0NTAwNzAyM30.S3HRecwWknLROuORA_nfOlizw5VFOeHp01ku3Y8f89M"
@@ -102,7 +104,7 @@ for idx in range(current_index+1, end_index):
     print(f"{idx}");
     current_index=idx
 
-    local_addr=f"C:\\Users\\shay\\alltmp\\otorita_pages_query\\Query\\{data_rows[current_index]['doc_file_name']}.html"
+    local_addr=f"C:\\Users\\shay\\my_projects\\index_otorita_in_supabase\\index\\otorita_pages_query\\Query\\{data_rows[current_index]['doc_file_name']}.html"
 
     # Open the local document file
     to_continue=True
@@ -121,20 +123,26 @@ for idx in range(current_index+1, end_index):
         # Extract text from the HTML
         document_text = soup.get_text()
 
-        lines = document_text.split('\n')
-            
-        # Remove empty lines or lines with only whitespace
-        cleaned_lines = [line.strip() for line in lines if line.strip()]
+        """
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=500,
+            chunk_overlap=50
+        )
+        chunks = splitter.create_documents([document_text])
+        chunks = [{'chunk': chunk.page_content, 'vector': None} for chunk in chunks]
 
-        # Join the non-empty lines back together
-        document_text = '\n'.join(cleaned_lines)
+        """
 
+        document_text = document_text.replace('\xa0', ' ').replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
+        document_text = re.sub(r'\s+', ' ', document_text)
 
-        # Split the document text into sentences
-        sentences = re.split(r'(?<=[.!?;])\s+', document_text)
+        # Split document_text into an array of lines using the specified separators
+        sentences = re.split(r'[.?;!:]', document_text)
+        # Remove any empty strings from the list
+        sentences = [sentence.strip() for sentence in sentences if sentence.strip()]
+        # Create overlapping chunks from the sentences
+        chunks = create_chunks(sentences, chunk_size=30, overlap=3)
 
-        # Create chunks with 5 sentences each and 1 sentence overlap
-        chunks = create_chunks(sentences, 5, 1)
 
         chunks_with_vectors = []
         # Print the chunks for verification

@@ -55,7 +55,7 @@ export default {
 		
 		try {
 			  response = await oOpenAi.embeddings.create({
-			  model: "text-embedding-ada-002",
+			  model: "text-embedding-3-large",
 			  input: newQuery
 			});
 			messages.vector = response.data[0].embedding;
@@ -73,12 +73,13 @@ export default {
 
 		const { data,error } = await supabase.rpc('match_documents', {
 			query_embedding: Array.from(messages.vector),
-			match_threshold: 0.8,
-			match_count: 5
+			match_threshold: 0.5,
+			match_count: 10
 		});
 
 		if (error) {
 			results.error=error;
+			results.vecroe=messages.vector;
 		}
 
 		let allParagraphsFoundConcat="";
@@ -89,8 +90,9 @@ export default {
 		}
 
 		messagesForOpenAI = [
-			{ role: 'system', content: "אתה מומחה משפטי לדיני עבודה. אתה צריך לקבל את הפסקאות הבאות ולענות רק באמצעותן על השאלה שתופיע בשאילתה הבאה. הפסקאות הן: "+allParagraphsFoundConcat },
-			{ role: 'user', content: newQuery }
+			{ role: 'system', content: "אתה מומחה ביחסי עבודה. תקבל שתי פיסות מידע: 1. הקשר שמכיל מידע על יחסי עבודה. 2. שאלה ביחסי עבודה. המטרה שלך היא לענות על השאלה אך ורק מתוך ההקשר שתקבל בחלק הראשון. אם אינך מצליח להרכיב את התשובה על סמך המידע שבחלק הראשון, תכתוב 'מצטער, אני לא יודע את התשובה לשאלה'. בבקשה אל תמציא תשובה."},
+			{ role: 'user', content: `קונטקסט: ${allParagraphsFoundConcat}`},
+			{ role: 'user', content: `שאלה: '${newQuery}'`} 
 		];
 
 		chatCompletion = await oOpenAi.chat.completions.create({
