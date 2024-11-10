@@ -30,26 +30,50 @@ export default {
 		var response;
 		var chatCompletion;
 		const results={};
-		
-		//here call openai to transform your query to a more structured query
-		messagesForOpenAI = [
-			{ role: 'system', content: "אתה מומחה לדיני עבודה ועליך להרכיב לי מהשאלה שתקבל בשאילתה הבאה את השאילתה שתאפשר לך לענות בצורה הטובה ביותר על השאלה המקורית. תשכתב את השאלה בלבד, בלי הקדמות וסיומות. תודה: "},
-			{ role: 'user', content: messages.query }
-		];
 
-//#1
-/*		
-		chatCompletion = await oOpenAi.chat.completions.create({
-			model: 'gpt-4o',
-			messages:messagesForOpenAI,
-			temperature: 1.1,
-			presence_penalty: 0,
-			frequency_penalty: 0
-		})
-		response = chatCompletion.choices[0].message;
-		const newQuery=response.content;
-*/
-		const newQuery=messages.query;
+		const orgQuery=messages.query;
+		var newQuery=messages.query;
+		
+		
+		if (0==1){
+			//here call openai to transform your query to a more structured query
+			messagesForOpenAI = [
+				{ role: 'system', content: "אתה מומחה לדיני עבודה ועליך להרכיב לי מהשאלה שתקבל בשאילתה הבאה את השאילתה שתאפשר לך לענות בצורה הטובה ביותר על השאלה המקורית. תשכתב את השאלה בלבד, בלי הקדמות וסיומות. תודה: "},
+				{ role: 'user', content: messages.query }
+			];
+			chatCompletion = await oOpenAi.chat.completions.create({
+				model: 'gpt-4o',
+				messages:messagesForOpenAI,
+				temperature: 1.1,
+				presence_penalty: 0,
+				frequency_penalty: 0
+			})
+			response = chatCompletion.choices[0].message;
+			newQuery=response.content;
+		}
+		else if (0==1){
+			//here call openai to extract keywords from the query
+			messagesForOpenAI = [
+				{ role: 'system', content: "אתה מומחה לדיני עבודה. אתה הולך לקבל בפרומפט הבא שאלה שקשורה לתחום יחסי העבודה. אני מבקש שתזקק מתוך השאלה את מילות המפתח, מילים שרלוונטיות לתחום יחסי העבודה. את התשובה תנסח באופן הבא: קודם את המחרוזת 'מילות מפתח:' ואחר-כך רשימה של מילות המפתח מופרדת על ידי פסיקים"},
+				{ role: 'user', content: messages.query }
+			];
+			chatCompletion = await oOpenAi.chat.completions.create({
+				model: 'gpt-4o',
+				messages:messagesForOpenAI,
+				temperature: 1.1,
+				presence_penalty: 0,
+				frequency_penalty: 0
+			})
+			response = chatCompletion.choices[0].message;
+			newQuery=response.content;
+		}
+		else{
+			newQuery=messages.query;
+		}
+
+
+
+
 
 		results.newQuery=newQuery;
 		
@@ -73,8 +97,8 @@ export default {
 
 		const { data,error } = await supabase.rpc('match_documents', {
 			query_embedding: Array.from(messages.vector),
-			match_threshold: 0.5,
-			match_count: 10
+			match_threshold: 0.3,
+			match_count: 30
 		});
 
 		if (error) {
@@ -90,9 +114,11 @@ export default {
 		}
 
 		messagesForOpenAI = [
-			{ role: 'system', content: "אתה מומחה ביחסי עבודה. תקבל שתי פיסות מידע: 1. הקשר שמכיל מידע על יחסי עבודה. 2. שאלה ביחסי עבודה. המטרה שלך היא לענות על השאלה אך ורק מתוך ההקשר שתקבל בחלק הראשון. אם אינך מצליח להרכיב את התשובה על סמך המידע שבחלק הראשון, תכתוב 'מצטער, אני לא יודע את התשובה לשאלה'. בבקשה אל תמציא תשובה."},
+//			{ role: 'system', content: "אתה הולך לקבל שתי שאילתות. הראשונה קונטקסט והשנייה שאלה. כמומחה ליחסי עבודה, אנא ענה על השאלה תוך התבססות בלעדית  על הקונטקסט. רם ריך תשובה תענה תשובה חלקית או תובנות אחרות שניתןל להפיק מהטקסט ושקשורות בעקיפין לשאלה"},
+			{ role: 'system', content: "אתה מומחה ביחסי עבודה. אני אשלח לך שני קטעים. הראשון הוא קונטקסט שמכיל מידע והשני הוא שאלה. אתה צריך לענות, כמומחה ליחסי עבודה, על השאלה, שהיא שאלה מתחום יחסי העבודה, רק בהתבסס על המידע שבקונטקסט. אם לא תוכל, תכתוב שאינך יכול לתת תשובה מדויקת בהתבסס על המידע שברשותך."},
+
 			{ role: 'user', content: `קונטקסט: ${allParagraphsFoundConcat}`},
-			{ role: 'user', content: `שאלה: '${newQuery}'`} 
+			{ role: 'user', content: `שאלה: '${orgQuery}'`} 
 		];
 
 		chatCompletion = await oOpenAi.chat.completions.create({
