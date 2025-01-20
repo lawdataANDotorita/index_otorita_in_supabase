@@ -103,6 +103,14 @@ for file_name in html_and_txt_files:
 
 #        print(f"document text is: {document_text}")
 
+
+        # Check if document_text is empty
+        if not document_text or document_text.isspace():
+            print(f"Skipping {file_name} - document text is empty")
+            continue
+
+
+
         document_text = document_text.replace('\xa0', ' ').replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
         document_text = re.sub(r'\s+', ' ', document_text)
 

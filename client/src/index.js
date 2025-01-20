@@ -71,16 +71,13 @@ export default {
 			newQuery=messages.query;
 		}
 
-
-
-
-
 		results.newQuery=newQuery;
 		
 		try {
 			  response = await oOpenAi.embeddings.create({
 			  model: "text-embedding-3-large",
-			  input: newQuery
+			  input: newQuery,
+			  dimensions: 1536,
 			});
 			messages.vector = response.data[0].embedding;
 		} 
