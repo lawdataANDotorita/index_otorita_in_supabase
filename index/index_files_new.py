@@ -141,8 +141,7 @@ for file_name in html_and_txt_files:
             else:
                 print(f"Inserted {len(response.data)} row(s)")
 
-        except Exception as e:
-            print(f"An error occurred: {e}")
+        except Exception as e:            print(f"An error occurred: {e}")
 
 
 
