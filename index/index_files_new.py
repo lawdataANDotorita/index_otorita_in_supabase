@@ -60,6 +60,7 @@ supabase: Client = create_client(url, key)
 
 
 local_dir: str = r"C:\Users\shay\my_projects\index_otorita_in_supabase\index\otorita_pages_query\Query"
+local_dir: str = r"C:\Users\shay\my_projects\index_otorita_in_supabase\index\otorita_pages_query\tables_for_worlds_ai_search"
 
 
 files_with_times = []
@@ -81,7 +82,7 @@ for file_name in html_and_txt_files:
 #    print(file_name_clean)
 
     to_continue=True
-    local_addr=f"{local_dir}\\{file_name_clean}.html"
+    local_addr=f"{local_dir}\\{file_name}"
     try:
         with open(local_addr, 'r', encoding='windows-1255') as f:
             document_content = f.read()
@@ -111,15 +112,21 @@ for file_name in html_and_txt_files:
 
 
 
-        document_text = document_text.replace('\xa0', ' ').replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
-        document_text = re.sub(r'\s+', ' ', document_text)
 
-        # Split document_text into an array of lines using the specified separators
-        sentences = re.split(r'[.?;!:]', document_text)
-        # Remove any empty strings from the list
-        sentences = [sentence.strip() for sentence in sentences if sentence.strip()]
-        # Create overlapping chunks from the sentences
-        chunks = create_chunks(sentences, chunk_size=30, overlap=3)
+        # Skip if file doesn't start with tbl_
+        if file_name.startswith('tbl_'):
+            # For non-table files, create a single chunk with the entire content
+            chunks = [{"chunk": document_text}]
+        else:
+            document_text = document_text.replace('\xa0', ' ').replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
+            document_text = re.sub(r'\s+', ' ', document_text)
+
+            # Split document_text into an array of lines using the specified separators
+            sentences = re.split(r'[.?;!:]', document_text)
+            # Remove any empty strings from the list
+            sentences = [sentence.strip() for sentence in sentences if sentence.strip()]
+            # Create overlapping chunks from the sentences
+            chunks = create_chunks(sentences, chunk_size=30, overlap=3)
 
 
         chunks_with_vectors = []
@@ -140,8 +147,21 @@ for file_name in html_and_txt_files:
 
         try:
             
+
+            # Delete existing records with the same name_in_db before inserting new ones
+            try:
+                delete_response = supabase.table('documents_for_work_world_for_lawyers').delete().eq('name_in_db', file_name_clean).execute()
+                if hasattr(delete_response, 'error') and delete_response.error:
+                    print(f"Error deleting existing records: {delete_response.error}")
+                else:
+                    print(f"Deleted existing records for {file_name_clean}")
+            except Exception as e:
+                print(f"Error during deletion: {e}")
+
+
+            
             # Insert data into the document table
-            response = supabase.table('documents').insert(chunks_with_vectors).execute()
+            response = supabase.table('documents_for_work_world_for_lawyers').insert(chunks_with_vectors).execute()
 
             # Check if the response contains errors
             if hasattr(response, 'error') and response.error:
@@ -149,7 +169,8 @@ for file_name in html_and_txt_files:
             else:
                 print(f"Inserted {len(response.data)} row(s)")
 
-        except Exception as e:            print(f"An error occurred: {e}")
+        except Exception as e: 
+            print(f"An error occurred: {e}")
 
 
 
