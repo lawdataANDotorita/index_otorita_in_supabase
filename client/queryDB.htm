@@ -75,61 +75,50 @@
         </div>
     </main>
     <script>
-        function submitQuery() {
-                document.querySelector("#eSend").disabled=true;
-                const query = document.getElementById('eQuery').value;
-                eQueryResults.innerHTML = ''; // Clear previous results
-                fetch('https://client.shaiz2206.workers.dev', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ query: query })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    const eQueryResults = document.getElementById('eQueryResults');
-                    const div = document.createElement('div');
-                    div.className = 'answer';
-                    div.innerText = data.answer;
-                    eQueryResults.appendChild(div);
-                    const sourceButton = document.createElement('button');
-                    sourceButton.innerText = 'למקורות';
-                    sourceButton.onclick = () => {
-                        document.querySelectorAll('.itm').forEach(item => {
-                            item.classList.toggle('hideMe');
-                        });
-                    };
-                    eQueryResults.appendChild(sourceButton);
-                    
-                    data.chunks.forEach(item => {
-                        const div = document.createElement('div');
-                        div.className = 'itm hideMe';
+    function submitQuery() {
+        document.querySelector("#eSend").disabled=true;
+        const query = document.getElementById('eQuery').value;
+        eQueryResults.innerHTML = ''; // Clear previous results
 
 
-                        const eContent=document.createElement('div');
-                        eContent.classList.add("content");
-                        eContent.innerHTML=item.content;
-                        div.appendChild(eContent);
 
-                        const eLinkBtn=document.createElement('div');
-                        eLinkBtn.classList.add("linkBtn");
-                        eLinkBtn.innerHTML="לפרסום";
-                        eLinkBtn.onclick=()=>{
-                            window.open("https://otorita.net/otorita_test/openDocByIndx.asp?c="+item.index_in_db);
-                        };
-                        div.appendChild(eLinkBtn);
-                        eQueryResults.appendChild(div);
+
+        fetch('https://client.shaiz2206.workers.dev', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ query: query })
+        })
+        .then(response => {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            let done = false;
+
+            const eQueryResults = document.getElementById('eQueryResults');
+            const div = document.createElement('div');
+            div.className = 'answer';
+            eQueryResults.appendChild(div);
+
+            const processStream = async () => {
+                while (!done) {
+                    const {value, done: readerDone } = await reader.read();
+                    done = readerDone;
+                    if (value) {
+                        const chunk = decoder.decode(value, { stream: true });
+                        div.innerText += chunk;
+                    }
+                    else{
                         document.querySelector("#eSend").disabled=false;
-                    });
-                    
-
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                });
-            }
-
+                    }
+                }
+            };
+            return processStream();
+        })
+        .catch(error => {
+            console.error('Error fetching data:', error);
+        });
+    }
     </script>
     
 </body>

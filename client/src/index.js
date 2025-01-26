@@ -9,7 +9,10 @@ import { createClient } from "@supabase/supabase-js";
 const corsHeaders = {
 	'Access-Control-Allow-Origin': '*',
 	'Access-Control-Allow-Methods': 'POST, OPTIONS',
-	'Access-Control-Allow-Headers': 'Content-Type'
+	'Access-Control-Allow-Headers': 'Content-Type',
+	'Content-Type': 'text/event-stream',
+	'Cache-Control': 'no-cache',
+	'Connection': 'keep-alive'
 };
 
 export default {
@@ -72,7 +75,9 @@ export default {
 		}
 
 		results.newQuery=newQuery;
-		
+		results.log="";
+
+		results.log+=" before calling create embedding with query. date is - "+new Date().toISOString();
 		try {
 			  response = await oOpenAi.embeddings.create({
 			  model: "text-embedding-3-large",
@@ -85,6 +90,8 @@ export default {
 			messages.vector=["Error generating embedding. erro is "+error];
 		}
 
+		results.log+=" before calling supabase with query. before take 1. date is - "+new Date().toISOString();
+
 		const privateKey = env.SUPABASE_API_KEY;
 		if (!privateKey) throw new Error(`Expected env var SUPABASE_API_KEY`);
 		const url = env.SUPABASE_URL;
@@ -92,15 +99,18 @@ export default {
 		if (!url) throw new Error(`Expected env var SUPABASE_URL`);
 		const supabase = createClient(url, privateKey);
 
+		results.log+=" before calling supabase with query. before take 2. date is - "+new Date().toISOString();
+
 		const { data,error } = await supabase.rpc('match_documents', {
 			query_embedding: Array.from(messages.vector),
 			match_threshold: 0.3,
-			match_count: 30
+			match_count: 30,
 		});
+		results.log+=" after calling supabase with query. date is - "+new Date().toISOString();
+		results.vector=messages.vector;
 
 		if (error) {
 			results.error=error;
-			results.vecroe=messages.vector;
 		}
 
 		let allParagraphsFoundConcat="";
@@ -118,17 +128,43 @@ export default {
 			{ role: 'user', content: `שאלה: '${orgQuery}'`} 
 		];
 
-		chatCompletion = await oOpenAi.chat.completions.create({
-			model: 'gpt-4o',
-			messages:messagesForOpenAI,
-			temperature: 1.1,
-			presence_penalty: 0,
-			frequency_penalty: 0
-		})
-		response = chatCompletion.choices[0].message;
+		results.log+=" before calling openai with query and data. date is - "+new Date().toISOString();
 
-		results.answer=response.content;
-
-		return new Response(JSON.stringify(results),{headers:corsHeaders});
+		const stream = new ReadableStream({
+			async start(controller) {
+			  const encoder = new TextEncoder();
+			  try {
+				// Call OpenAI with stream:true.
+				const chatCompletion = await oOpenAi.chat.completions.create({
+				  model: "gpt-4o",
+				  messages: messagesForOpenAI,
+				  temperature: 0,
+				  presence_penalty: 0,
+				  frequency_penalty: 0,
+				  stream: true
+				});
+	  
+	  
+				// for await...of will yield each streamed chunk.
+				for await (const chunk of chatCompletion) {
+				  
+				 const content = chunk?.choices?.[0]?.delta?.content || '';
+				  // Log for debugging, but remove if you want.
+				  console.log("Streaming chunk from OpenAI:", content);
+				  // enqueue the chunk to the client.
+				  controller.enqueue(encoder.encode(content));
+				}
+	  
+				controller.close();
+			  } catch (error) {
+				// If there's an error, report it and signal failure.
+				console.error("Error during OpenAI streaming:", error);
+				controller.error(error);
+			  }
+			}
+		  });
+		  return new Response(stream, {
+			headers: corsHeaders
+		  });
 	}
 };
