@@ -94,11 +94,13 @@
             const reader = response.body.getReader();
             const decoder = new TextDecoder('utf-8');
             let done = false;
-
+            let bContextMode = false;
+          
             const eQueryResults = document.getElementById('eQueryResults');
-            const div = document.createElement('div');
-            div.className = 'answer';
-            eQueryResults.appendChild(div);
+            const eAnswer = document.createElement('div');
+            const eContext = document.createElement('div');
+            eAnswer.className = 'answer';
+            eQueryResults.appendChild(eAnswer);
 
             const processStream = async () => {
                 while (!done) {
@@ -106,13 +108,70 @@
                     done = readerDone;
                     if (value) {
                         const chunk = decoder.decode(value, { stream: true });
-                        div.innerText += chunk;
+                        if (!bContextMode) {
+                            eAnswer.innerText += chunk;
+                        }
+                        else{
+                            eContext.innerHTML += chunk;
+                        }
                     }
                     else{
+
+                        const sourceButton = document.createElement('button');
+                        sourceButton.innerText = 'למקורות';
+                        sourceButton.onclick = () => {
+                            document.querySelectorAll('.itm').forEach(item => {
+                                item.classList.toggle('hideMe');
+                            });
+                        };
+                        eQueryResults.appendChild(sourceButton);
+
+
                         document.querySelector("#eSend").disabled=false;
+                        let oContext = JSON.parse(eContext.innerHTML);
+                        console.log(oContext.log);
+                        
+                        
+                        oContext.chunks.forEach(item => {
+                            const eSource = document.createElement('div');
+                            eSource.className = 'itm hideMe';
+
+
+                            const eContent=document.createElement('div');
+                            eContent.classList.add("content");
+                            eContent.innerHTML=item.content;
+                            eSource.appendChild(eContent);
+
+                            const eLinkBtn=document.createElement('div');
+                            eLinkBtn.classList.add("linkBtn");
+                            eLinkBtn.innerHTML="לפרסום";
+                            eLinkBtn.onclick=()=>{
+                                window.open("https://otorita.net/otoritadb/pages/query/"+item.name_in_db+".html");
+                            };
+                            eSource.appendChild(eLinkBtn);
+                            eQueryResults.appendChild(eSource);
+                        });
                     }
                 }
             };
+
+            // Check for and handle *&* delimiter in the answer text
+            const checkAndSplitAnswer = () => {
+                const answerText = eAnswer.innerText;
+                if (answerText.includes('*&*')) {
+                    bContextMode = true;
+                    const [answer, context] = answerText.split('*&*');
+                    eAnswer.innerText = answer;
+                    eContext.innerText = context;
+                }
+            };
+
+            // Add observer to watch for changes to answer text
+            const observer = new MutationObserver(checkAndSplitAnswer);
+            observer.observe(eAnswer, { characterData: true, childList: true, subtree: true });
+
+            
+            console.log(eContext.innerHTML);
             return processStream();
         })
         .catch(error => {

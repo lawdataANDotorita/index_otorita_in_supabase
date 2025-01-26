@@ -116,7 +116,7 @@ export default {
 		let allParagraphsFoundConcat="";
 
 		if (data) {
-			results.chunks = data.map(item => {return {content:item.content,index_in_db:item.index_in_db,similarity:item.similarity};});
+			results.chunks = data.map(item => {return {content:item.content,name_in_db:item.name_in_db,similarity:item.similarity};});
 			allParagraphsFoundConcat=data.map(item => item.content).join(' ')
 		}
 
@@ -144,6 +144,7 @@ export default {
 				  stream: true
 				});
 	  
+				results.log+=" after calling openai with query and data. before statring to stream. date is - "+new Date().toISOString();
 	  
 				// for await...of will yield each streamed chunk.
 				for await (const chunk of chatCompletion) {
@@ -154,7 +155,10 @@ export default {
 				  // enqueue the chunk to the client.
 				  controller.enqueue(encoder.encode(content));
 				}
-	  
+
+				// Stream the initial results object
+				controller.enqueue(encoder.encode(`*&* ${JSON.stringify(results)}\n\n`));
+
 				controller.close();
 			  } catch (error) {
 				// If there's an error, report it and signal failure.
