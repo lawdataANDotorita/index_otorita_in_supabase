@@ -23,7 +23,13 @@ export default {
 			return new Response(null, { headers: corsHeaders });
 		}
 
-		const messages = await request.json();
+		let messages;
+		try {
+			messages = await request.json();
+		} catch (error) {
+			// If JSON parsing fails, use a default query
+			messages = {query: "מה השער היציג של 100 יין יפני בתאריך ה 02/01/2025 ?"};
+		}
 
 		const oOpenAi = new OpenAI({
 			apiKey:env.OPENAI_API_KEY,
@@ -33,10 +39,9 @@ export default {
 		var response;
 		var chatCompletion;
 		const results={};
-
+		var bIncludeLog=false;
 		const orgQuery=messages.query;
 		var newQuery=messages.query;
-		
 		
 		if (0==1){
 			//here call openai to transform your query to a more structured query
@@ -77,7 +82,20 @@ export default {
 		results.newQuery=newQuery;
 		results.log="";
 
-		results.log+=" before calling create embedding with query. date is - "+new Date().toISOString();
+		// Check for date in dd/MM/yyyy format in query
+		const dateRegex = /\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/;
+		const dateMatch = messages.query.match(dateRegex);
+		let queryDate = null;
+		
+		if (dateMatch) {
+			queryDate = `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`;
+		}
+		
+
+
+		if (bIncludeLog){
+			results.log+=" before calling create embedding with query. date is - "+new Date().toISOString();
+		}
 		try {
 			  response = await oOpenAi.embeddings.create({
 			  model: "text-embedding-3-large",
@@ -85,12 +103,18 @@ export default {
 			  dimensions: 1536,
 			});
 			messages.vector = response.data[0].embedding;
+
+			// Normalize the embedding vector using L2 normalization
+			const magnitude = Math.sqrt(messages.vector.reduce((sum, val) => sum + val * val, 0));
+			messages.vector = messages.vector.map(val => val / magnitude);
 		} 
 		catch (error) {
 			messages.vector=["Error generating embedding. erro is "+error];
 		}
 
-		results.log+=" before calling supabase with query. before take 1. date is - "+new Date().toISOString();
+		if (bIncludeLog){
+			results.log+=" before calling supabase with query. before take 1. date is - "+new Date().toISOString();
+		}
 
 		const privateKey = env.SUPABASE_API_KEY;
 		if (!privateKey) throw new Error(`Expected env var SUPABASE_API_KEY`);
@@ -99,16 +123,23 @@ export default {
 		if (!url) throw new Error(`Expected env var SUPABASE_URL`);
 		const supabase = createClient(url, privateKey);
 
-		results.log+=" before calling supabase with query. before take 2. date is - "+new Date().toISOString();
+		if (bIncludeLog){
+			results.log+=" before calling supabase with query. before take 2. date is - "+new Date().toISOString();
+		}
 
-		const { data,error } = await supabase.rpc('match_documents', {
-			query_embedding: Array.from(messages.vector),
-			match_threshold: 0.3,
+
+
+		
+		const { data,error } = await supabase.rpc('match_documents_test', {
+			query_embedding: messages.vector,
+			match_threshold: 0.5,
 			match_count: 30,
+			p_dt:queryDate,
 		});
-		results.log+=" after calling supabase with query. date is - "+new Date().toISOString();
-		results.vector=messages.vector;
-
+		if (bIncludeLog){
+			results.log+=" after calling supabase with query. date is - "+new Date().toISOString();
+			results.vector=messages.vector;
+		}
 		if (error) {
 			results.error=error;
 		}
@@ -128,7 +159,9 @@ export default {
 			{ role: 'user', content: `שאלה: '${orgQuery}'`} 
 		];
 
-		results.log+=" before calling openai with query and data. date is - "+new Date().toISOString();
+		if (bIncludeLog){
+			results.log+=" before calling openai with query and data. date is - "+new Date().toISOString();
+		}
 
 		const stream = new ReadableStream({
 			async start(controller) {
@@ -136,7 +169,7 @@ export default {
 			  try {
 				// Call OpenAI with stream:true.
 				const chatCompletion = await oOpenAi.chat.completions.create({
-				  model: "gpt-4o",
+				  model: "gpt-4.1-mini",
 				  messages: messagesForOpenAI,
 				  temperature: 0,
 				  presence_penalty: 0,
@@ -144,14 +177,16 @@ export default {
 				  stream: true
 				});
 	  
-				results.log+=" after calling openai with query and data. before statring to stream. date is - "+new Date().toISOString();
+				if (bIncludeLog){
+					results.log+=" after calling openai with query and data. before statring to stream. date is - "+new Date().toISOString();
+				}
 	  
 				// for await...of will yield each streamed chunk.
 				for await (const chunk of chatCompletion) {
 				  
 				 const content = chunk?.choices?.[0]?.delta?.content || '';
 				  // Log for debugging, but remove if you want.
-				  console.log("Streaming chunk from OpenAI:", content);
+				  //console.log("Streaming chunk from OpenAI:", content);
 				  // enqueue the chunk to the client.
 				  controller.enqueue(encoder.encode(content));
 				}
