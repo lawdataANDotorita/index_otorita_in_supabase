@@ -103,10 +103,6 @@ export default {
 			  dimensions: 1536,
 			});
 			messages.vector = response.data[0].embedding;
-
-			// Normalize the embedding vector using L2 normalization
-			const magnitude = Math.sqrt(messages.vector.reduce((sum, val) => sum + val * val, 0));
-			messages.vector = messages.vector.map(val => val / magnitude);
 		} 
 		catch (error) {
 			messages.vector=["Error generating embedding. erro is "+error];
