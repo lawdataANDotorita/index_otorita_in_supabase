@@ -59,16 +59,25 @@ supabase: Client = create_client(url, key)
 
 
 
-local_dir: str = r"C:\Users\shay\my_projects\index_otorita_in_supabase\index\otorita_pages_query\Query"
-local_dir: str = r"C:\Users\shay\my_projects\index_otorita_in_supabase\index\otorita_pages_query\tables_for_worlds_ai_search"
-
+# local_dir: str = r"C:\Users\shay\my_projects\index_otorita_in_supabase\index\otorita_pages_query\Query"
+# local_dir: str = r"C:\Users\shay\my_projects\index_otorita_in_supabase\index\otorita_pages_query\tables_for_worlds_ai_search"
+local_dir: str = r"c:\users\shay\alltmp\query"
+local_dir: str = r"c:\inetpub\datafax\datafaxdb\pages\query"
 
 files_with_times = []
+# Get timestamp from 2 months ago
+time_frame = time.time() - (60 * 60 * 24 * 120)  # 120 days in seconds
+
+time_frame = time.time() - (60 * 60 * 24 * 2)  # 2 days in seconds
+
+
 for f in os.listdir(local_dir):
     if f.endswith(('.html', '.txt')):
         file_path = os.path.join(local_dir, f)
         mod_time = os.path.getmtime(file_path)
-        files_with_times.append((f, mod_time))
+        # Only append files that are within the time frame
+        if mod_time >= time_frame:
+            files_with_times.append((f, mod_time))
 
 # Sort files by modification time (newest first)
 files_with_times.sort(key=lambda x: x[1], reverse=True)
