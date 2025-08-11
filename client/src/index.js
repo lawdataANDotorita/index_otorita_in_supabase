@@ -28,7 +28,7 @@ export default {
 			messages = await request.json();
 		} catch (error) {
 			// If JSON parsing fails, use a default query
-			messages = {query: "מה השער היציג של 100 יין יפני בתאריך ה 02/01/2025 ?"};
+			messages = {query: "מה השער היציג של 100 יין יפני בתאריך ה 02/01/2025 ?",history:[]};
 		}
 
 		const oOpenAi = new OpenAI({
@@ -42,7 +42,8 @@ export default {
 		var bIncludeLog=false;
 		const orgQuery=messages.query;
 		var newQuery=messages.query;
-		
+		var arHistory = messages.history;
+
 		if (0==1){
 			//here call openai to transform your query to a more structured query
 			messagesForOpenAI = [
@@ -52,7 +53,7 @@ export default {
 			chatCompletion = await oOpenAi.chat.completions.create({
 				model: 'gpt-4o',
 				messages:messagesForOpenAI,
-				temperature: 1.1,
+				temperature: 0,
 				presence_penalty: 0,
 				frequency_penalty: 0
 			})
@@ -129,7 +130,7 @@ export default {
 		const { data,error } = await supabase.rpc('match_documents_test', {
 			query_embedding: messages.vector,
 			match_threshold: 0.5,
-			match_count: 30,
+			match_count: 10,
 			p_dt:queryDate,
 		});
 		if (bIncludeLog){
@@ -147,10 +148,11 @@ export default {
 			allParagraphsFoundConcat=data.map(item => item.content).join(' ')
 		}
 
+		
 		messagesForOpenAI = [
 //			{ role: 'system', content: "אתה הולך לקבל שתי שאילתות. הראשונה קונטקסט והשנייה שאלה. כמומחה ליחסי עבודה, אנא ענה על השאלה תוך התבססות בלעדית  על הקונטקסט. רם ריך תשובה תענה תשובה חלקית או תובנות אחרות שניתןל להפיק מהטקסט ושקשורות בעקיפין לשאלה"},
 			{ role: 'system', content: "אתה מומחה ביחסי עבודה. אני אשלח לך שני קטעים. הראשון הוא קונטקסט שמכיל מידע והשני הוא שאלה. אתה צריך לענות, כמומחה ליחסי עבודה, על השאלה, שהיא שאלה מתחום יחסי העבודה, רק בהתבסס על המידע שבקונטקסט. אם לא תוכל, תכתוב שאינך יכול לתת תשובה מדויקת בהתבסס על המידע שברשותך."},
-
+			...arHistory,
 			{ role: 'user', content: `קונטקסט: ${allParagraphsFoundConcat}`},
 			{ role: 'user', content: `שאלה: '${orgQuery}'`} 
 		];
@@ -188,7 +190,7 @@ export default {
 				}
 
 				// Stream the initial results object
-				controller.enqueue(encoder.encode(`*&* ${JSON.stringify(results)}\n\n`));
+//				controller.enqueue(encoder.encode(`*&* ${JSON.stringify(results)}\n\n`));
 
 				controller.close();
 			  } catch (error) {
