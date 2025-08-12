@@ -41,8 +41,19 @@ export default {
 		const results={};
 		var bIncludeLog=false;
 		const orgQuery=messages.query;
-		var newQuery=messages.query;
+
+		var newQuery="";
 		var arHistory = messages.history;
+		if (Array.isArray(arHistory)) {
+			for (const item of arHistory) {
+				if (item.role === "user" && typeof item.content === "string") {
+					// Add a newline and then the content to newQuery
+					newQuery += "\n" + item.content;
+				}
+			}
+		}
+		
+		newQuery +=!!newQuery ? ("\n"+messages.query) : messages.query;
 
 		if (0==1){
 			//here call openai to transform your query to a more structured query
@@ -51,7 +62,7 @@ export default {
 				{ role: 'user', content: messages.query }
 			];
 			chatCompletion = await oOpenAi.chat.completions.create({
-				model: 'gpt-4o',
+				model: 'gpt-4.1-mini',
 				messages:messagesForOpenAI,
 				temperature: 0,
 				presence_penalty: 0,
@@ -67,7 +78,7 @@ export default {
 				{ role: 'user', content: messages.query }
 			];
 			chatCompletion = await oOpenAi.chat.completions.create({
-				model: 'gpt-4o',
+				model: 'gpt-4.1-mini',
 				messages:messagesForOpenAI,
 				temperature: 1.1,
 				presence_penalty: 0,
@@ -75,9 +86,6 @@ export default {
 			})
 			response = chatCompletion.choices[0].message;
 			newQuery=response.content;
-		}
-		else{
-			newQuery=messages.query;
 		}
 
 		results.newQuery=newQuery;
