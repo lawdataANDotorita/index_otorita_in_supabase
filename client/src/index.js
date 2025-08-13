@@ -7,7 +7,7 @@ import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 
 const corsHeaders = {
-	'Access-Control-Allow-Origin': '*',
+	'Access-Control-Allow-Origin': 'https://otorita.net',
 	'Access-Control-Allow-Methods': 'POST, OPTIONS',
 	'Access-Control-Allow-Headers': 'Content-Type',
 	'Content-Type': 'text/event-stream',
