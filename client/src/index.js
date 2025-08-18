@@ -135,7 +135,7 @@ export default {
 
 
 		
-		const { data,error } = await supabase.rpc('match_documents_test', {
+		const { data,error } = await supabase.rpc('match_documents_new', {
 			query_embedding: messages.vector,
 			match_threshold: 0.5,
 			match_count: 10,
