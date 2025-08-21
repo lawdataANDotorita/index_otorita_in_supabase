@@ -10,6 +10,17 @@ import sys
 # from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 
+def get_pirsom_data_by_docnm(docNm):
+    url = "https://otorita.net/otorita_test/getpirsomdatabypirsomnmindb.asp"
+    params = {'docNm': docNm}
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        return response.text
+    except requests.RequestException as e:
+        print(f"Error fetching data for docNm '{docNm}': {e}")
+        return ""
+
 # Function to create overlapping chunks
 def create_chunks(sentences, chunk_size, overlap):
     chunks = []
@@ -149,6 +160,7 @@ for file_name in html_and_txt_files:
             chunks_with_vectors.append({
                 "content": chunk["chunk"],
                 "name_in_db": file_name_clean,
+                "doc_name": get_pirsom_data_by_docnm(file_name_clean),
                 "embedding": chunk["vector"],
                 "type": "table" if file_name_clean.startswith("tbl") else "article",
             })
