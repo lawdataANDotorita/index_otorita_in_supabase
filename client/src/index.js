@@ -152,7 +152,7 @@ export default {
 		let allParagraphsFoundConcat="";
 
 		if (data) {
-			results.chunks = data.map(item => {return {content:item.content,name_in_db:item.name_in_db,similarity:item.similarity};});
+			results.chunks = data.map(item => {return {content:item.content,name_in_db:item.name_in_db,similarity:item.similarity,doc_name:item.doc_name};});
 			allParagraphsFoundConcat=data.map(item => item.content).join(' ')
 		}
 
@@ -199,6 +199,20 @@ export default {
 
 				// Stream the initial results object
 //				controller.enqueue(encoder.encode(`*&* ${JSON.stringify(results)}\n\n`));
+
+
+				let arSources = [];
+				if (results.chunks && Array.isArray(results.chunks)) {
+					for (const chunk of results.chunks) {
+						if (chunk.doc_name && !arSources.includes(chunk.doc_name)) {
+							arSources.push(chunk.doc_name);
+						}
+					}
+				}
+
+				if (arSources.length>0){
+					controller.enqueue(encoder.encode(`*^*${arSources.join("*&*")}`));
+				}
 
 				controller.close();
 			  } catch (error) {
