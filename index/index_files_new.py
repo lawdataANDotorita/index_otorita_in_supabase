@@ -160,7 +160,7 @@ for file_name in html_and_txt_files:
             chunks_with_vectors.append({
                 "content": chunk["chunk"],
                 "name_in_db": file_name_clean,
-                "doc_name": get_pirsom_data_by_docnm(file_name_clean),
+                "doc_name": get_pirsom_data_by_docnm(file_name_clean) if get_pirsom_data_by_docnm(file_name_clean) != "" else file_name_clean,
                 "embedding": chunk["vector"],
                 "type": "table" if file_name_clean.startswith("tbl") else "article",
             })
