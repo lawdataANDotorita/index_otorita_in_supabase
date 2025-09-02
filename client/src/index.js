@@ -43,7 +43,7 @@ export default {
 		const orgQuery=messages.query;
 
 		var newQuery="";
-		var arHistory = messages.history;
+		var arHistory = messages.history!==undefined ? messages.history : [];
 		if (Array.isArray(arHistory)) {
 			for (const item of arHistory) {
 				if (item.role === "user" && typeof item.content === "string") {
@@ -134,8 +134,8 @@ export default {
 
 
 
-		
-		const { data,error } = await supabase.rpc('match_documents_new', {
+		const sMatchDocumentsFunction=messages.history!==undefined ? "match_documents_new" : "match_documents_test";
+		const { data,error } = await supabase.rpc(sMatchDocumentsFunction, {
 			query_embedding: messages.vector,
 			match_threshold: 0.5,
 			match_count: 10,
