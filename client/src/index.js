@@ -204,8 +204,8 @@ export default {
 				let arSources = [];
 				if (results.chunks && Array.isArray(results.chunks)) {
 					for (const chunk of results.chunks) {
-						if (chunk.doc_name && !arSources.includes(chunk.doc_name)) {
-							arSources.push(chunk.doc_name);
+						if (chunk.doc_name && !arSources.includes(chunk.name_in_db+"*%*"+chunk.doc_name)) {
+							arSources.push(chunk.name_in_db+"*%*"+chunk.doc_name);
 						}
 					}
 				}
