@@ -204,7 +204,10 @@ export default {
 				let arSources = [];
 				if (results.chunks && Array.isArray(results.chunks)) {
 					for (const chunk of results.chunks) {
-						if (chunk.doc_name && !arSources.includes(chunk.name_in_db+"*%*"+chunk.doc_name)) {
+						// INSERT_YOUR_CODE
+						// Check if chunk.name_in_db is present in any of the arSources strings
+						const isNameInSources = arSources.some(src => src.includes(chunk.doc_name));
+						if (chunk.doc_name && !isNameInSources) {
 							arSources.push(chunk.name_in_db+"*%*"+chunk.doc_name);
 						}
 					}
