@@ -40,7 +40,6 @@ export default {
 		var chatCompletion;
 		const results={};
 		var bIncludeLog=false;
-		const orgQuery=messages.query;
 
 		var newQuery="";
 		var arHistory = messages.history!==undefined ? messages.history : [];
