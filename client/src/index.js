@@ -55,10 +55,23 @@ export default {
 		
 		newQuery +=!!newQuery ? ("\n"+messages.query) : messages.query;
 
-		if (0==1){
+		if (1==1){
+
+			const PROMPT_REWRITE = `אתה מומחה ליחסי עבודה ושכר בישראל. עליך לבצע שתי משימות:
+שכתוב שאלה: שכתב את השאלה שתקבל כך שתהיה ברורה, ספציפית ומכילה את כל הפרטים הרלוונטיים הדרושים למתן תשובה מדויקת ומלאה. ודא שהשאלה כוללת הקשר משפטי וחוקי מתאים.
+אם השאלה כמותית אנא נסח את השאלה כך שתבהיר לבינה המלאכותית שעליה להשתמש בחישובים המתאימים כדי להגיע לתשובה ושעליה לפרט את החישובים שעשתה
+2. ציין את סוג השאלה: 
+האם זו שאלה כמותית - אם התשובה היא מספר, אחוז, סכום כסף או תחשיב מדויק
+האם זו שאלה איכותיח - אם התשובה היא הסבר, הנחיות או ניתוח משפטי.
+החזר JSON עם שני משתנים:
+1. quesion - תוכן השאלה המשוכתבת כפי שהיא בלי הקדמות או סיומות
+2. type: 
+אם זו שאלה איכותית החזר 0. 
+אם זו שאלה כמותית החזר 1
+`;
 			//here call openai to transform your query to a more structured query
 			messagesForOpenAI = [
-				{ role: 'system', content: "אתה מומחה לדיני עבודה ועליך להרכיב לי מהשאלה שתקבל בשאילתה הבאה את השאילתה שתאפשר לך לענות בצורה הטובה ביותר על השאלה המקורית. תשכתב את השאלה בלבד, בלי הקדמות וסיומות. תודה: "},
+				{ role: 'system', content: PROMPT_REWRITE},
 				{ role: 'user', content: messages.query }
 			];
 			chatCompletion = await oOpenAi.chat.completions.create({
@@ -74,7 +87,7 @@ export default {
 		else if (0==1){
 			//here call openai to extract keywords from the query
 			messagesForOpenAI = [
-				{ role: 'system', content: "אתה מומחה לדיני עבודה. אתה הולך לקבל בפרומפט הבא שאלה שקשורה לתחום יחסי העבודה. אני מבקש שתזקק מתוך השאלה את מילות המפתח, מילים שרלוונטיות לתחום יחסי העבודה. את התשובה תנסח באופן הבא: קודם את המחרוזת 'מילות מפתח:' ואחר-כך רשימה של מילות המפתח מופרדת על ידי פסיקים"},
+				{ role: 'system', content: "אתה מומחה לדיני עבודה. אתה הולך לקבל בפרומפט הבא שאלה שקשורה לתחום יחסי עבודה ושכר. אני מבקש שתזקק מתוך השאלה את מילות המפתח, מילים שרלוונטיות לתחום יחסי עבודה ושכר. את התשובה תנסח באופן הבא: קודם את המחרוזת 'מילות מפתח:' ואחר-כך רשימה של מילות המפתח מופרדת על ידי פסיקים"},
 				{ role: 'user', content: messages.query }
 			];
 			chatCompletion = await oOpenAi.chat.completions.create({
@@ -90,6 +103,7 @@ export default {
 
 		results.newQuery=newQuery;
 		results.log="";
+		const oNewQuery=JSON.parse(newQuery);
 
 		// Check for date in dd/MM/yyyy format in query
 		const dateRegex = /\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/;
@@ -108,7 +122,7 @@ export default {
 		try {
 			  response = await oOpenAi.embeddings.create({
 			  model: "text-embedding-3-large",
-			  input: newQuery,
+			  input: oNewQuery.question,
 			  dimensions: 1536,
 			});
 			messages.vector = response.data[0].embedding;
@@ -156,13 +170,39 @@ export default {
 			allParagraphsFoundConcat=data.map(item => item.content).join(' ')
 		}
 
-		
+		const EXPERT_PROMPT = `אתה מומחה מוביל ביחסי עבודה ודיני עבודה בישראל.
+
+			הוראות עבודה:
+
+			1. קריאת החומר: אני אשלח לך שני חלקים נפרדים:
+			- קונטקסט: מידע רקע ונתונים רלוונטיים
+			- שאלה: שאלה ספציפית בתחום יחסי העבודה והשכר
+
+			2. דרישות התשובה:
+			- ענה על השאלה אך ורק בהתבסס על המידע שבקונטקסט
+			- אל תוסיף מידע חיצוני או ידע כללי שלך
+			- אל תנחש או תשער מעבר למידע הנתון
+			- תן תשובה מדויקת, תמציתית ומקצועית כמומחה בתחום
+			- תניח שהמשתמש מבין בתחום יחסי העבודה והשכר ואל תסביר דברים מהיסודות של התחום
+
+			3. אם המידע לא מספיק: כתב בדיוק את המשפט הבא: "איני יכול לתת תשובה מדויקת בהתבסס על המידע שברשותי"
+
+			4. עיצוב התשובה:
+			- חשוב מאוד: אל תשתמש בשום סימון עיצוב או מארקאפ
+			- אל תשתמש בכוכביות, קו תחתון, או כל סימן עיצוב אחר
+			- כתב בטקסט רגיל בלבד ללא עיצובים
+			- אל תשתמש ברשימות מסומנות או ממוספרות
+			- אל תשתמש בכותרות מעוצבות
+			- מותר ורצוי להשתמש בירידות שורה להפרדה בין נושאים
+
+			5. רמת המקצועיות: השתמש בשפה מקצועית מדויקת של מומחה ביחסי עבודה ודיני עבודה`;
+
+
 		messagesForOpenAI = [
-//			{ role: 'system', content: "אתה הולך לקבל שתי שאילתות. הראשונה קונטקסט והשנייה שאלה. כמומחה ליחסי עבודה, אנא ענה על השאלה תוך התבססות בלעדית  על הקונטקסט. רם ריך תשובה תענה תשובה חלקית או תובנות אחרות שניתןל להפיק מהטקסט ושקשורות בעקיפין לשאלה"},
-			{ role: 'system', content: "אתה מומחה ביחסי עבודה. אני אשלח לך שני קטעים. הראשון הוא קונטקסט שמכיל מידע והשני הוא שאלה. אתה צריך לענות, כמומחה ליחסי עבודה, על השאלה, שהיא שאלה מתחום יחסי העבודה, רק בהתבסס על המידע שבקונטקסט. אם לא תוכל, תכתוב שאינך יכול לתת תשובה מדויקת בהתבסס על המידע שברשותך."},
+			{ role: 'system', content:EXPERT_PROMPT},
 			...arHistory,
 			{ role: 'user', content: `קונטקסט: ${allParagraphsFoundConcat}`},
-			{ role: 'user', content: `שאלה: '${orgQuery}'`} 
+			{ role: 'user', content: `שאלה: '${oNewQuery.question}'`} 
 		];
 
 		if (bIncludeLog){
@@ -175,9 +215,9 @@ export default {
 			  try {
 				// Call OpenAI with stream:true.
 				const chatCompletion = await oOpenAi.chat.completions.create({
-				  model: "gpt-4.1-mini",
+				  model: parseInt(oNewQuery.type)===1 ? "gpt-4.1-mini" : "gpt-4.1-mini",
 				  messages: messagesForOpenAI,
-				  temperature: 0,
+				  temperature:0,
 				  presence_penalty: 0,
 				  frequency_penalty: 0,
 				  stream: true
@@ -212,6 +252,7 @@ export default {
 						}
 					}
 				}
+				arSources.push("111"+"*%*"+oNewQuery.question+"^^^"+oNewQuery.type+"^^^"+(parseInt(oNewQuery.type)===1 ? "gpt-4.1-mini" : "gpt-4.1-mini"));
 
 				if (arSources.length>0){
 					controller.enqueue(encoder.encode(`*^*${arSources.join("*&*")}`));
