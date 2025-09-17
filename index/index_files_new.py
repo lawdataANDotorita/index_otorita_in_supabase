@@ -14,6 +14,8 @@ import json
 
 
 def get_pirsom_data_by_docnm(docNm):
+    return ""
+    """
     url = "https://otorita.net/otorita_test/getpirsomdatabypirsomnmindb.asp"
     params = {'docNm': docNm}
     try:
@@ -23,7 +25,7 @@ def get_pirsom_data_by_docnm(docNm):
     except requests.RequestException as e:
         print(f"Error fetching data for docNm '{docNm}': {e}")
         return ""
-
+    """
 # Function to create overlapping chunks
 def create_chunks(words, chunk_size, overlap):
     chunks = []
@@ -116,7 +118,7 @@ files_with_times.sort(key=lambda x: x[1], reverse=True)
 html_and_txt_files = [filename for filename, _ in files_with_times]
 
 # Configuration for batch processing
-BATCH_SIZE = 50
+BATCH_SIZE = 20
 STATE_FILE_PATH = os.path.join(current_dir, 'processing_state.json')
 
 # Load previous progress
@@ -218,7 +220,7 @@ for batch_index, file_name in enumerate(files_to_process):
             if 0 == 1:
                 # Delete existing records with the same name_in_db before inserting new ones
                 try:
-                    delete_response = supabase.table('documents_for_work_world_for_lawyers_new').delete().eq('name_in_db', file_name_clean).execute()
+                    delete_response = supabase.table('documents_for_work_world_for_lawyers_voyage').delete().eq('name_in_db', file_name_clean).execute()
                     if hasattr(delete_response, 'error') and delete_response.error:
                         print(f"Error deleting existing records: {delete_response.error}")
                     else:
@@ -229,7 +231,7 @@ for batch_index, file_name in enumerate(files_to_process):
 
             
             # Insert data into the document table
-            response = supabase.table('documents_for_work_world_for_lawyers_new').insert(chunks_with_vectors).execute()
+            response = supabase.table('documents_for_work_world_for_lawyers_voyage').insert(chunks_with_vectors).execute()
 
             # Check if the response contains errors
             if hasattr(response, 'error') and response.error:
