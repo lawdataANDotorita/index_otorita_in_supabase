@@ -11,10 +11,11 @@
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.5.2",
     "vitest": "2.0.5",
-    "wrangler": "^3.60.3"
+    "wrangler": "^4.37.1"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.6",
-    "openai": "^4.68.3"
+    "openai": "^4.68.3",
+    "voyageai": "^0.0.8"
   }
 }

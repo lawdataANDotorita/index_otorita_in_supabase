@@ -4,6 +4,7 @@
 
 */
 import OpenAI from "openai";
+import { VoyageAIClient } from "voyageai";
 import { createClient } from "@supabase/supabase-js";
 
 const corsHeaders = {
@@ -34,6 +35,9 @@ export default {
 		const oOpenAi = new OpenAI({
 			apiKey:env.OPENAI_API_KEY,
 			baseURL:"https://gateway.ai.cloudflare.com/v1/1719b913db6cbf5b9e3267b924244e58/query_db_gateway/openai"
+		});
+		const oVoyageAI = new VoyageAIClient({
+			apiKey: env.VOYAGEAI_API_KEY
 		});
 		var messagesForOpenAI;
 		var response;
@@ -119,15 +123,14 @@ export default {
 			results.log+=" before calling create embedding with query. date is - "+new Date().toISOString();
 		}
 		try {
-			  response = await oOpenAi.embeddings.create({
-			  model: "text-embedding-3-large",
+			  response = await oVoyageAI.embed({
 			  input: oNewQuery.question,
-			  dimensions: 1536,
+			  model: "voyage-3.5"
 			});
 			messages.vector = response.data[0].embedding;
 		} 
 		catch (error) {
-			messages.vector=["Error generating embedding. erro is "+error];
+			messages.vector=["Error generating embedding. error is "+error];
 		}
 
 		if (bIncludeLog){
@@ -147,10 +150,10 @@ export default {
 
 
 
-		const sMatchDocumentsFunction=messages.history!==undefined ? "match_documents_new" : "match_documents_test";
+		const sMatchDocumentsFunction=messages.history!==undefined ? "match_documents_new_voyage" : "match_documents_test";
 		const { data,error } = await supabase.rpc(sMatchDocumentsFunction, {
 			query_embedding: messages.vector,
-			match_threshold: 0.5,
+			match_threshold: 0.6,
 			match_count: 10,
 			p_dt:queryDate,
 		});
@@ -184,7 +187,7 @@ export default {
 			- תן תשובה מדויקת, תמציתית ומקצועית כמומחה בתחום
 			- תניח שהמשתמש מבין בתחום יחסי העבודה והשכר ואל תסביר דברים מהיסודות של התחום
 
-			3. אם המידע לא מספיק: כתב בדיוק את המשפט הבא: "איני יכול לתת תשובה מדויקת בהתבסס על המידע שברשותי"
+			3. אם המידע חסר או לא מספיק: כתב בדיוק את המשפט הבא: "איני יכול לתת תשובה מדויקת בהתבסס על המידע שברשותי"
 
 			4. עיצוב התשובה:
 			- חשוב מאוד: אל תשתמש בשום סימון עיצוב או מארקאפ

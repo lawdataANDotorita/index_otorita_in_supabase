@@ -8,6 +8,7 @@ import time
 import sys
 import voyageai
 import requests
+import json
 
 # from langchain.text_splitter import RecursiveCharacterTextSplitter
 
@@ -47,6 +48,26 @@ def get_exe_directory():
 def get_embedding(text):
     response = voyage_ai_client.embed(text, model="voyage-3.5",input_type="document")
     return response.embeddings[0]
+
+def save_progress(current_index, total_files, state_file_path):
+    """Save current progress to state file"""
+    progress_data = {
+        "current_index": current_index,
+        "total_files": total_files,
+        "last_updated": time.time()
+    }
+    with open(state_file_path, 'w') as f:
+        json.dump(progress_data, f)
+
+def load_progress(state_file_path):
+    """Load progress from state file"""
+    if os.path.exists(state_file_path):
+        try:
+            with open(state_file_path, 'r') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, FileNotFoundError):
+            return None
+    return None
 
 current_dir = get_exe_directory()
 
@@ -94,8 +115,30 @@ files_with_times.sort(key=lambda x: x[1], reverse=True)
 # Extract just the filenames from files_with_times
 html_and_txt_files = [filename for filename, _ in files_with_times]
 
-# iterate on all the files in the directory
-for file_name in html_and_txt_files:
+# Configuration for batch processing
+BATCH_SIZE = 50
+STATE_FILE_PATH = os.path.join(current_dir, 'processing_state.json')
+
+# Load previous progress
+progress = load_progress(STATE_FILE_PATH)
+start_index = 0
+
+if progress:
+    start_index = progress.get('current_index', 0)
+    print(f"Resuming from file index {start_index}")
+else:
+    print("Starting from the beginning")
+
+# Calculate end index for this batch
+end_index = min(start_index + BATCH_SIZE, len(html_and_txt_files))
+files_to_process = html_and_txt_files[start_index:end_index]
+
+print(f"Processing files {start_index} to {end_index-1} of {len(html_and_txt_files)} total files")
+print(f"Files in this batch: {len(files_to_process)}")
+
+# iterate on the files in this batch
+for batch_index, file_name in enumerate(files_to_process):
+    current_file_index = start_index + batch_index
     file_name_clean = os.path.splitext(file_name)[0]
 #    print(file_name_clean)
 
@@ -171,16 +214,17 @@ for file_name in html_and_txt_files:
 
         try:
             
-
-            # Delete existing records with the same name_in_db before inserting new ones
-            try:
-                delete_response = supabase.table('documents_for_work_world_for_lawyers_new').delete().eq('name_in_db', file_name_clean).execute()
-                if hasattr(delete_response, 'error') and delete_response.error:
-                    print(f"Error deleting existing records: {delete_response.error}")
-                else:
-                    print(f"Deleted existing records for {file_name_clean}")
-            except Exception as e:
-                print(f"Error during deletion: {e}")
+            # when inserting to new table we don't need to delete existing records
+            if 0 == 1:
+                # Delete existing records with the same name_in_db before inserting new ones
+                try:
+                    delete_response = supabase.table('documents_for_work_world_for_lawyers_new').delete().eq('name_in_db', file_name_clean).execute()
+                    if hasattr(delete_response, 'error') and delete_response.error:
+                        print(f"Error deleting existing records: {delete_response.error}")
+                    else:
+                        print(f"Deleted existing records for {file_name_clean}")
+                except Exception as e:
+                    print(f"Error during deletion: {e}")
 
 
             
@@ -196,6 +240,19 @@ for file_name in html_and_txt_files:
         except Exception as e: 
             print(f"An error occurred: {e}")
 
+    # Save progress after each file
+    save_progress(current_file_index + 1, len(html_and_txt_files), STATE_FILE_PATH)
+    print(f"Processed file {current_file_index + 1}/{len(html_and_txt_files)}: {file_name}")
 
+# Check if we've completed all files
+if end_index >= len(html_and_txt_files):
+    print("All files have been processed!")
+    # Optionally remove the state file when complete
+    if os.path.exists(STATE_FILE_PATH):
+        os.remove(STATE_FILE_PATH)
+        print("Processing complete. State file removed.")
+else:
+    print(f"Batch complete. {len(html_and_txt_files) - end_index} files remaining.")
+    print("Run the script again to continue processing the next batch.")
 
               
