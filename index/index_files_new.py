@@ -86,13 +86,7 @@ url: str = "https://rmigfbegvrilgentysif.supabase.co"
 key: str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJtaWdmYmVndnJpbGdlbnR5c2lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mjk0MzEwMjMsImV4cCI6MjA0NTAwNzAyM30.S3HRecwWknLROuORA_nfOlizw5VFOeHp01ku3Y8f89M"
 supabase: Client = create_client(url, key)
 
-
-
-# local_dir: str = r"C:\Users\shay\my_projects\index_otorita_in_supabase\index\otorita_pages_query\Query"
-# local_dir: str = r"C:\Users\shay\my_projects\index_otorita_in_supabase\index\otorita_pages_query\tables_for_worlds_ai_search"
 local_dir: str = r"c:\users\shay\alltmp\query"
-local_dir: str = r"c:\inetpub\datafax\datafaxdb\pages\query"
-local_dir: str = r"C:\Users\shay\my_projects\index_otorita_in_supabase\index\otorita_pages_query\Query"
 
 files_with_times = []
 # Get timestamp from 2 months ago
@@ -118,7 +112,7 @@ files_with_times.sort(key=lambda x: x[1], reverse=True)
 html_and_txt_files = [filename for filename, _ in files_with_times]
 
 # Configuration for batch processing
-BATCH_SIZE = 20
+BATCH_SIZE = 20000
 STATE_FILE_PATH = os.path.join(current_dir, 'processing_state.json')
 
 # Load previous progress
@@ -189,7 +183,7 @@ for batch_index, file_name in enumerate(files_to_process):
             # Split document_text into an array of words
             words = document_text.split()
             # Create overlapping chunks from the words
-            chunks = create_chunks(words, chunk_size=500, overlap=75)
+            chunks = create_chunks(words, chunk_size=300, overlap=45)
             
 
 
@@ -245,6 +239,10 @@ for batch_index, file_name in enumerate(files_to_process):
     # Save progress after each file
     save_progress(current_file_index + 1, len(html_and_txt_files), STATE_FILE_PATH)
     print(f"Processed file {current_file_index + 1}/{len(html_and_txt_files)}: {file_name}")
+    time.sleep(0.5)
+
+
+
 
 # Check if we've completed all files
 if end_index >= len(html_and_txt_files):

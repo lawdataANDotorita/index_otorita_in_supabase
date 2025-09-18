@@ -1,5 +1,6 @@
 index/build/
 index/dist/
+build/
 otorita_pages_query/
 *.xlsx
 *.exe
