@@ -153,7 +153,7 @@ export default {
 		const sMatchDocumentsFunction=messages.history!==undefined ? "match_documents_new_voyage" : "match_documents_test";
 		const { data,error } = await supabase.rpc(sMatchDocumentsFunction, {
 			query_embedding: messages.vector,
-			match_threshold: 0.6,
+			match_threshold: 0.5,
 			match_count: 10,
 			p_dt:queryDate,
 		});
@@ -184,7 +184,8 @@ export default {
 			- ענה על השאלה אך ורק בהתבסס על המידע שבקונטקסט
 			- אל תוסיף מידע חיצוני או ידע כללי שלך
 			- אל תנחש או תשער מעבר למידע הנתון
-			- תן תשובה מדויקת, תמציתית ומקצועית כמומחה בתחום
+			- תן תשובה מדויקת, מפורטת ומקצועית כמומחה בתחום
+			- אם השאלה היא שאלה כמותית המבקשת למצוא מספר או סכום אנא פרט וציין שלב אחר שלב בדרך לתשובה. היה מפורט ככל האפשר
 			- תניח שהמשתמש מבין בתחום יחסי העבודה והשכר ואל תסביר דברים מהיסודות של התחום
 
 			3. אם המידע חסר או לא מספיק: כתב בדיוק את המשפט הבא: "איני יכול לתת תשובה מדויקת בהתבסס על המידע שברשותי"
