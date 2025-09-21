@@ -122,6 +122,47 @@ export default {
 		if (bIncludeLog){
 			results.log+=" before calling create embedding with query. date is - "+new Date().toISOString();
 		}
+
+
+		// INSERT_YOUR_CODE
+
+		// Sometimes oNewQuery.question may contain an illegitimate JSON note or invalid JSON.
+		// To handle this, let's try to parse oNewQuery.question as JSON, and if it fails, fallback to using it as a plain string.
+		try {
+			const response = await fetch("https://api.voyageai.com/v1/contextualizedembeddings", {
+			  method: "POST",
+			  headers: {
+				"Content-Type": "application/json",
+				"Authorization": `Bearer ${env.VOYAGEAI_API_KEY}`, // The API key is passed in the header
+			  },
+			  body: JSON.stringify({
+				inputs: [[oNewQuery.question]],
+				model: "voyage-context-3",
+			  }),
+			});
+		
+			if (!response.ok) {
+			  const errorBody = await response.json();
+			  throw new Error(`HTTP error 4! Status: ${response.status}, Details: ${JSON.stringify(errorBody)}`);
+			}
+		
+			const data = await response.json();
+			messages.vector=data.data[0].data[0].embedding;
+		  } catch (error) {
+			throw new Error(`voyageai error 4: ${error.message}`);
+		  }
+
+
+
+
+
+
+
+
+
+
+
+		/*
 		try {
 			  response = await oVoyageAI.embed({
 			  input: oNewQuery.question,
@@ -136,6 +177,8 @@ export default {
 		if (bIncludeLog){
 			results.log+=" before calling supabase with query. before take 1. date is - "+new Date().toISOString();
 		}
+*/
+
 
 		const privateKey = env.SUPABASE_API_KEY;
 		if (!privateKey) throw new Error(`Expected env var SUPABASE_API_KEY`);
@@ -218,7 +261,7 @@ export default {
 			  try {
 				// Call OpenAI with stream:true.
 				const chatCompletion = await oOpenAi.chat.completions.create({
-				  model: parseInt(oNewQuery.type)===1 ? "gpt-4.1-mini" : "gpt-4.1-mini",
+				  model: parseInt(oNewQuery.type)===1 ? "gpt-4.1" : "gpt-4.1-mini",
 				  messages: messagesForOpenAI,
 				  temperature:0,
 				  presence_penalty: 0,
@@ -255,8 +298,7 @@ export default {
 						}
 					}
 				}
-				arSources.push("111"+"*%*"+oNewQuery.question+"^^^"+oNewQuery.type+"^^^"+(parseInt(oNewQuery.type)===1 ? "gpt-4.1-mini" : "gpt-4.1-mini"));
-
+				arSources.push("111"+"*%*"+oNewQuery.question+"^^^"+oNewQuery.type+"^^^"+(parseInt(oNewQuery.type)===1 ? "gpt-4.1" : "gpt-4.1-mini"));
 				if (arSources.length>0){
 					controller.enqueue(encoder.encode(`*^*${arSources.join("*&*")}`));
 				}

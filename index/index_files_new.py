@@ -44,12 +44,27 @@ def get_exe_directory():
         # Running as executable
         return os.path.dirname(sys.executable)
     else:
-        # Running as script
+        # Ru    nning as script
         return os.path.dirname(os.path.abspath(__file__))
 
+def get_embeddings(chunks):
+    try:
+        vectors = [chunk["chunk"] for chunk in chunks]
+        response = voyage_ai_client.contextualized_embed(inputs=[vectors], model="voyage-context-3",input_type="document")
+        for idx, chunk in enumerate(chunks):
+                chunk["vector"] = response.results[0].embeddings[idx]
+    except Exception as e:
+        print(f"Error getting embeddings: {e}")
+    return chunks
+
 def get_embedding(text):
-    response = voyage_ai_client.embed(text, model="voyage-3.5",input_type="document")
-    return response.embeddings[0]
+    try:
+        response = voyage_ai_client.contextualized_embed(inputs=[[text]], model="voyage-context-3",input_type="document")
+        return response.results[0].embeddings[0]
+    except Exception as e:
+        print(f"Error getting embedding: {e}")
+        return None
+        
 
 def save_progress(current_index, total_files, state_file_path):
     """Save current progress to state file"""
@@ -135,6 +150,12 @@ print(f"Files in this batch: {len(files_to_process)}")
 # iterate on the files in this batch
 for batch_index, file_name in enumerate(files_to_process):
     current_file_index = start_index + batch_index
+
+    # INSERT_YOUR_CODE
+    if current_file_index > 100:
+        print("Reached file index limit of 100. Exiting.")
+        break
+    
     file_name_clean = os.path.splitext(file_name)[0]
 #    print(file_name_clean)
 
@@ -183,15 +204,18 @@ for batch_index, file_name in enumerate(files_to_process):
             # Split document_text into an array of words
             words = document_text.split()
             # Create overlapping chunks from the words
-            chunks = create_chunks(words, chunk_size=300, overlap=45)
+            chunks = create_chunks(words, chunk_size=300, overlap=0)
             
 
 
         chunks_with_vectors = []
+        
+        get_embeddings(chunks)        
+        
         # Print the chunks for verification
         for i, chunk in enumerate(chunks):
             try:
-                chunk["vector"]=get_embedding(chunk["chunk"])
+                #chunk["vector"]=get_embedding(chunk["chunk"])
                 # Only add chunks that have successful embeddings
                 if chunk["vector"] is not None:
                     chunks_with_vectors.append({
@@ -213,19 +237,20 @@ for batch_index, file_name in enumerate(files_to_process):
             # when inserting to new table we don't need to delete existing records
             if 0 == 1:
                 # Delete existing records with the same name_in_db before inserting new ones
+                '''
                 try:
-                    delete_response = supabase.table('documents_for_work_world_for_lawyers_voyage').delete().eq('name_in_db', file_name_clean).execute()
+                    delete_response = supabase.table('documents_for_work_world_for_lawyers_voyage_context_3').delete().eq('name_in_db', file_name_clean).execute()
                     if hasattr(delete_response, 'error') and delete_response.error:
                         print(f"Error deleting existing records: {delete_response.error}")
                     else:
                         print(f"Deleted existing records for {file_name_clean}")
                 except Exception as e:
                     print(f"Error during deletion: {e}")
-
+                '''
 
             
             # Insert data into the document table
-            response = supabase.table('documents_for_work_world_for_lawyers_voyage').insert(chunks_with_vectors).execute()
+            response = supabase.table('documents_for_work_world_for_lawyers_voyage_context_3').insert(chunks_with_vectors).execute()
 
             # Check if the response contains errors
             if hasattr(response, 'error') and response.error:
