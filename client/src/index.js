@@ -45,6 +45,29 @@ export default {
 		const results={};
 		var bIncludeLog=false;
 
+
+		let sModel="";
+		let sMatchFunction="";
+
+		switch (messages.model) {
+			case "1"://voyage-multilingual-2
+				sModel="voyage-multilingual-2";
+				sMatchFunction="match_documents_new_voyage_multilingual_2";
+				break;
+			case "2"://voyage-3.5
+				sModel="voyage-3.5";
+				sMatchFunction="match_documents_new_voyage";
+				break;
+			case "3"://voayage-context-3
+				sModel="voyage-context-3";
+				sMatchFunction="match_documents_new_voyage_context_3";
+				break;
+			default:
+				sModel="openai-text-embedding-3-large";
+				sMatchFunction="match_documents_new";
+		
+		}
+
 		var newQuery="";
 		var arHistory = messages.history!==undefined ? messages.history : [];
 		if (Array.isArray(arHistory)) {
@@ -122,15 +145,60 @@ export default {
 		if (bIncludeLog){
 			results.log+=" before calling create embedding with query. date is - "+new Date().toISOString();
 		}
-		try {
-			  response = await oVoyageAI.embed({
-			  input: oNewQuery.question,
-			  model: "voyage-3.5"
-			});
-			messages.vector = response.data[0].embedding;
-		} 
-		catch (error) {
-			messages.vector=["Error generating embedding. error is "+error];
+
+		switch (sModel) {
+			case "voyage-multilingual-2":
+			case "voyage-3.5":
+				try {
+					response = await oVoyageAI.embed({
+					input: oNewQuery.question,
+					model: sModel
+					});
+					messages.vector = response.data[0].embedding;
+				} 
+				catch (error) {
+					messages.vector=["Error generating embedding. error is "+error];
+				}
+				break;
+			case "voyage-context-3":
+				try {
+					response = await fetch("https://api.voyageai.com/v1/contextualizedembeddings", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						"Authorization": `Bearer ${env.VOYAGEAI_API_KEY}`, // The API key is passed in the header
+					},
+					body: JSON.stringify({
+							inputs: [[oNewQuery.question]],
+							model: sModel,
+						}),
+					});
+				
+					if (!response.ok) {
+						const errorBody = await response.json();
+						throw new Error(`HTTP error 4! Status: ${response.status}, Details: ${JSON.stringify(errorBody)}`);
+					}
+
+					const data = await response.json();
+					messages.vector=data.data[0].data[0].embedding;
+				} catch (error) {
+					throw new Error(`voyageai error 4: ${error.message}`);
+				}
+				break;
+
+			default:
+				try {
+					response = await oOpenAi.embeddings.create({
+					model: "text-embedding-3-large",
+					input: oNewQuery.question,
+					dimensions: 1536,
+					});
+					messages.vector = response.data[0].embedding;
+				} 
+				catch (error) {
+					messages.vector=["Error generating embedding. erro is "+error];
+				}
+				break;
 		}
 
 		if (bIncludeLog){
@@ -150,7 +218,7 @@ export default {
 
 
 
-		const sMatchDocumentsFunction=messages.history!==undefined ? "match_documents_new_voyage" : "match_documents_test";
+		const sMatchDocumentsFunction=messages.history!==undefined ? sMatchFunction : "match_documents_test";
 		const { data,error } = await supabase.rpc(sMatchDocumentsFunction, {
 			query_embedding: messages.vector,
 			match_threshold: 0.5,
@@ -218,7 +286,7 @@ export default {
 			  try {
 				// Call OpenAI with stream:true.
 				const chatCompletion = await oOpenAi.chat.completions.create({
-				  model: parseInt(oNewQuery.type)===1 ? "gpt-4.1-mini" : "gpt-4.1-mini",
+				  model: parseInt(oNewQuery.type)===1 ? "gpt-4.1" : "gpt-4.1-mini",
 				  messages: messagesForOpenAI,
 				  temperature:0,
 				  presence_penalty: 0,
@@ -255,7 +323,7 @@ export default {
 						}
 					}
 				}
-				arSources.push("111"+"*%*"+oNewQuery.question+"^^^"+oNewQuery.type+"^^^"+(parseInt(oNewQuery.type)===1 ? "gpt-4.1-mini" : "gpt-4.1-mini"));
+				arSources.push("111"+"*%*"+oNewQuery.question+"^^^"+oNewQuery.type+"^^^"+(parseInt(oNewQuery.type)===1 ? "gpt-4.1" : "gpt-4.1-mini")+"^^^"+sModel);
 
 				if (arSources.length>0){
 					controller.enqueue(encoder.encode(`*^*${arSources.join("*&*")}`));

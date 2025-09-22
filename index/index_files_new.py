@@ -48,7 +48,7 @@ def get_exe_directory():
         return os.path.dirname(os.path.abspath(__file__))
 
 def get_embedding(text):
-    response = voyage_ai_client.embed(text, model="voyage-3.5",input_type="document")
+    response = voyage_ai_client.embed(text, model="voyage-multilingual-2",input_type="document")
     return response.embeddings[0]
 
 def save_progress(current_index, total_files, state_file_path):
@@ -134,6 +134,8 @@ print(f"Files in this batch: {len(files_to_process)}")
 
 # iterate on the files in this batch
 for batch_index, file_name in enumerate(files_to_process):
+    if batch_index>100:
+        break
     current_file_index = start_index + batch_index
     file_name_clean = os.path.splitext(file_name)[0]
 #    print(file_name_clean)
@@ -214,7 +216,7 @@ for batch_index, file_name in enumerate(files_to_process):
             if 0 == 1:
                 # Delete existing records with the same name_in_db before inserting new ones
                 try:
-                    delete_response = supabase.table('documents_for_work_world_for_lawyers_voyage').delete().eq('name_in_db', file_name_clean).execute()
+                    delete_response = supabase.table('documents_for_work_world_for_lawyers_voyage_multilingual_2').delete().eq('name_in_db', file_name_clean).execute()
                     if hasattr(delete_response, 'error') and delete_response.error:
                         print(f"Error deleting existing records: {delete_response.error}")
                     else:
@@ -225,7 +227,7 @@ for batch_index, file_name in enumerate(files_to_process):
 
             
             # Insert data into the document table
-            response = supabase.table('documents_for_work_world_for_lawyers_voyage').insert(chunks_with_vectors).execute()
+            response = supabase.table('documents_for_work_world_for_lawyers_voyage_multilingual_2').insert(chunks_with_vectors).execute()
 
             # Check if the response contains errors
             if hasattr(response, 'error') and response.error:
