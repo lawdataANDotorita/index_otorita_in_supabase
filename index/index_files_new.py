@@ -9,6 +9,7 @@ import sys
 import voyageai
 import requests
 import json
+import cohere
 
 # from langchain.text_splitter import RecursiveCharacterTextSplitter
 
@@ -47,6 +48,17 @@ def get_exe_directory():
         # Running as script
         return os.path.dirname(os.path.abspath(__file__))
 
+
+def get_embedding_cohere(text):
+    try:
+        response = cohere_client.embed(texts=[text],input_type="search_document",model="embed-multilingual-v3.0")
+    except Exception as e:
+        print(f"Error getting embedding with cohere: {e}")
+        return None
+    return response.embeddings[0]
+
+
+
 def get_embedding(text):
     response = voyage_ai_client.embed(text, model="voyage-multilingual-2",input_type="document")
     return response.embeddings[0]
@@ -82,11 +94,18 @@ with open(voyage_api_key_path, 'r') as f:
 
 voyage_ai_client=voyageai.Client(api_key=voyage_api_key)
 
+cohere_api_key_path = os.path.join(current_dir, 'cohere_api_key.txt')
+with open(cohere_api_key_path, 'r') as f:
+    cohere_api_key = f.read().strip()
+cohere_client = cohere.Client(cohere_api_key)
+
 url: str = "https://rmigfbegvrilgentysif.supabase.co"
 key: str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJtaWdmYmVndnJpbGdlbnR5c2lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mjk0MzEwMjMsImV4cCI6MjA0NTAwNzAyM30.S3HRecwWknLROuORA_nfOlizw5VFOeHp01ku3Y8f89M"
 supabase: Client = create_client(url, key)
 
-local_dir: str = r"c:\users\shay\alltmp\query"
+local_dir: str = r"c:\users\shay\alltmp\query\tmp"
+local_dir: str = r"c:\inetpub\datafax\datafaxdb\pages\query"
+
 
 files_with_times = []
 # Get timestamp from 2 months ago
@@ -193,7 +212,7 @@ for batch_index, file_name in enumerate(files_to_process):
         # Print the chunks for verification
         for i, chunk in enumerate(chunks):
             try:
-                chunk["vector"]=get_embedding(chunk["chunk"])
+                chunk["vector"]=get_embedding_cohere(chunk["chunk"])
                 # Only add chunks that have successful embeddings
                 if chunk["vector"] is not None:
                     chunks_with_vectors.append({
@@ -216,7 +235,7 @@ for batch_index, file_name in enumerate(files_to_process):
             if 0 == 1:
                 # Delete existing records with the same name_in_db before inserting new ones
                 try:
-                    delete_response = supabase.table('documents_for_work_world_for_lawyers_voyage_multilingual_2').delete().eq('name_in_db', file_name_clean).execute()
+                    delete_response = supabase.table('documents_for_work_world_for_lawyers_cohere').delete().eq('name_in_db', file_name_clean).execute()
                     if hasattr(delete_response, 'error') and delete_response.error:
                         print(f"Error deleting existing records: {delete_response.error}")
                     else:
@@ -227,7 +246,7 @@ for batch_index, file_name in enumerate(files_to_process):
 
             
             # Insert data into the document table
-            response = supabase.table('documents_for_work_world_for_lawyers_voyage_multilingual_2').insert(chunks_with_vectors).execute()
+            response = supabase.table('documents_for_work_world_for_lawyers_cohere').insert(chunks_with_vectors).execute()
 
             # Check if the response contains errors
             if hasattr(response, 'error') and response.error:
