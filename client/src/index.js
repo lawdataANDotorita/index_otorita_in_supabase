@@ -6,6 +6,7 @@
 import OpenAI from "openai";
 import { VoyageAIClient } from "voyageai";
 import { createClient } from "@supabase/supabase-js";
+import { CohereClient } from "cohere-ai";
 
 const corsHeaders = {
 	'Access-Control-Allow-Origin': 'https://otorita.net',
@@ -39,6 +40,9 @@ export default {
 		const oVoyageAI = new VoyageAIClient({
 			apiKey: env.VOYAGEAI_API_KEY
 		});
+		const oCohere = new CohereClient({
+			token: env.COHERE_API_KEY
+		});
 		var messagesForOpenAI;
 		var response;
 		var chatCompletion;
@@ -61,6 +65,14 @@ export default {
 			case "3"://voayage-context-3
 				sModel="voyage-context-3";
 				sMatchFunction="match_documents_new_voyage_context_3";
+				break;
+			case "4"://cohere
+				sModel="cohere";
+				sMatchFunction="match_documents_new_cohere";
+				break;
+			case "5"://cohere_1000
+				sModel="cohere_1000";
+				sMatchFunction="match_documents_new_cohere_1000";
 				break;
 			default:
 				sModel="openai-text-embedding-3-large";
@@ -147,6 +159,20 @@ export default {
 		}
 
 		switch (sModel) {
+			case "cohere":
+			case "cohere_1000":
+				try {
+					response = await oCohere.embed({
+					texts: [oNewQuery.question],
+					model: "embed-multilingual-v3.0",
+					input_type: "search_query"
+					});
+					messages.vector = response.embeddings[0];
+				} 
+				catch (error) {
+					messages.vector=["Error generating embedding. error is "+error];
+				}
+				break;
 			case "voyage-multilingual-2":
 			case "voyage-3.5":
 				try {
@@ -324,7 +350,6 @@ export default {
 					}
 				}
 				arSources.push("111"+"*%*"+oNewQuery.question+"^^^"+oNewQuery.type+"^^^"+(parseInt(oNewQuery.type)===1 ? "gpt-4.1" : "gpt-4.1-mini")+"^^^"+sModel);
-
 				if (arSources.length>0){
 					controller.enqueue(encoder.encode(`*^*${arSources.join("*&*")}`));
 				}
