@@ -66,6 +66,14 @@ export default {
 				sModel="voyage-context-3";
 				sMatchFunction="match_documents_new_voyage_context_3";
 				break;
+			case "4"://cohere
+				sModel="cohere";
+				sMatchFunction="match_documents_new_cohere";
+				break;
+			case "5"://cohere_1000
+				sModel="cohere_1000";
+				sMatchFunction="match_documents_new_cohere_1000";
+				break;
 			default:
 				sModel="openai-text-embedding-3-large";
 				sMatchFunction="match_documents_new";
@@ -150,11 +158,9 @@ export default {
 			results.log+=" before calling create embedding with query. date is - "+new Date().toISOString();
 		}
 
-		sModel="cohere";
-		sMatchFunction="match_documents_new_cohere";
-
 		switch (sModel) {
 			case "cohere":
+			case "cohere_1000":
 				try {
 					response = await oCohere.embed({
 					texts: [oNewQuery.question],
