@@ -43,11 +43,15 @@ export default {
 		const oCohere = new CohereClient({
 			token: env.COHERE_API_KEY
 		});
-		var messagesForOpenAI;
-		var response;
-		var chatCompletion;
-		const results={};
-		var bIncludeLog=false;
+	var messagesForOpenAI;
+	var response;
+	var chatCompletion;
+	const results={};
+	var bIncludeLog=false;
+	const toIncludeTimes = true; // Set to true to track execution times
+	if (toIncludeTimes) {
+		results.timeStamps = {};
+	}
 
 
 		let sModel="";
@@ -68,11 +72,11 @@ export default {
 				break;
 			case "4"://cohere
 				sModel="cohere";
-				sMatchFunction="match_documents_new_cohere_400_with_relevant_chunks_emphasized";
+				sMatchFunction="match_documents_new_cohere_400";
 				break;
 			case "5"://cohere_1000
 				sModel="cohere_1000";
-				sMatchFunction="match_documents_new_cohere_1000_with_relevant_chunks_emphasized";
+				sMatchFunction="return_most_similar_chunks_only_cohere_1000";
 				break;
 			default:
 				sModel="openai-text-embedding-3-large";
@@ -91,11 +95,15 @@ export default {
 			}
 		}
 		
-		newQuery +=!!newQuery ? ("\n"+messages.query) : messages.query;
+	newQuery +=!!newQuery ? ("\n"+messages.query) : messages.query;
 
-		if (1==1){
+	if (toIncludeTimes) {
+		results.timeStamps.start = Date.now();
+	}
 
-			const PROMPT_REWRITE = `אתה מומחה ליחסי עבודה ושכר בישראל. תפקידך לנרמל שאלות משתמש לפורמט אחיד.
+	if (1==1){
+
+		const PROMPT_REWRITE = `אתה מומחה ליחסי עבודה ושכר בישראל. תפקידך לנרמל שאלות משתמש לפורמט אחיד.
 הוראות קריטיות:
 1. התעלם לחלוטין ממילות נימוס, ברכות או פתיחות (שלום, תודה, בבקשה וכו')
 2. חלץ רק את ליבת השאלה המשפטית
@@ -136,10 +144,14 @@ export default {
 				presence_penalty: 0,
 				frequency_penalty: 0
 			})
-			response = chatCompletion.choices[0].message;
-			newQuery=response.content;
+		response = chatCompletion.choices[0].message;
+		newQuery=response.content;
+		
+		if (toIncludeTimes) {
+			results.timeStamps.after_rewrite = Date.now();
 		}
-		else if (0==1){
+	}
+	else if (0==1){
 			//here call openai to extract keywords from the query
 			messagesForOpenAI = [
 				{ role: 'system', content: "אתה מומחה לדיני עבודה. אתה הולך לקבל בפרומפט הבא שאלה שקשורה לתחום יחסי עבודה ושכר. אני מבקש שתזקק מתוך השאלה את מילות המפתח, מילים שרלוונטיות לתחום יחסי עבודה ושכר. את התשובה תנסח באופן הבא: קודם את המחרוזת 'מילות מפתח:' ואחר-כך רשימה של מילות המפתח מופרדת על ידי פסיקים"},
@@ -238,13 +250,17 @@ export default {
 					});
 					messages.vector = response.data[0].embedding;
 				} 
-				catch (error) {
-					messages.vector=["Error generating embedding. erro is "+error];
-				}
-				break;
-		}
+			catch (error) {
+				messages.vector=["Error generating embedding. erro is "+error];
+			}
+			break;
+	}
 
-		if (bIncludeLog){
+	if (toIncludeTimes) {
+		results.timeStamps.after_embedding = Date.now();
+	}
+
+	if (bIncludeLog){
 			results.log+=" before calling supabase with query. before take 1. date is - "+new Date().toISOString();
 		}
 
@@ -268,72 +284,71 @@ export default {
 			match_count: 30,
 			p_dt:queryDate,
 		});
-		if (bIncludeLog){
-			results.log+=" after calling supabase with query. date is - "+new Date().toISOString();
-			results.vector=messages.vector;
-		}
-		if (error) {
-			results.error=error;
-		}
+	if (toIncludeTimes) {
+		results.timeStamps.after_supabase = Date.now();
+	}
+
+	if (bIncludeLog){
+		results.log+=" after calling supabase with query. date is - "+new Date().toISOString();
+		results.vector=messages.vector;
+	}
+	if (error) {
+		results.error=error;
+	}
 
 		let allParagraphsFoundConcat="";
 
 		if (data) {
-			results.chunks = data.map(item => {return {content:item.content,name_in_db:item.name_in_db,similarity:item.similarity,doc_name:item.doc_name,is_high_similarity:item.is_high_similarity};});
+			results.chunks = data.map(item => {return {content:item.content,name_in_db:item.name_in_db,similarity:item.similarity,doc_name:item.doc_name};});
 			allParagraphsFoundConcat=data.map(item => item.content).join(' ');
 		}
 
 		results.generalMsg="";
-		results.highSimilarityNamesInDb=[];
-		let rankedIndices = [];
-		let medalsNameInDb = [];
-		let highSimilarityChunks = [];
-		// Rerank high similarity chunks using Cohere
-		if (sModel.includes("cohere") && results.chunks && Array.isArray(results.chunks)) {
-			
-			
-			// Add name_in_db of high similarity chunks to results.highSimilarityNamesInDb
-			highSimilarityChunks = results.chunks.filter(chunk => chunk.is_high_similarity == 1);
-			results.highSimilarityNamesInDb = highSimilarityChunks
-				.map(chunk => chunk.name_in_db);
-
-			if (highSimilarityChunks.length > 0) {
+		if (sModel.includes("cohere_1000") && results.chunks && Array.isArray(results.chunks)) {
+			if (results.chunks.length > 0) {
 				try {
 					const rerankedResponse = await oCohere.rerank({
 						query: oNewQuery.question,
-						documents: highSimilarityChunks.map(chunk => chunk.content),
+						documents: 	results.chunks.map(chunk => chunk.content),
 						model: "rerank-multilingual-v3.0",
-						topN: 5 /*highSimilarityChunks.length // Return all reranked*/
+						topN: 5 /*results.chunks.length // Return all reranked*/
 					});
-					// rerankedResponse contains the reranked results, i.e. rerankedResponse.results is an array of {index, relevanceScore}
-					// We want to extract the top 3 ranked chunks according to cohere's rerank response.
-					// Then, collect all chunks (from results.chunks) that share the name_in_db property with each of the 3, maintaining order (gold, silver, bronze).
-
-					// 1. Get name_in_db for each of the 3 ranked chunks, in order (gold, silver, bronze)
-					rankedIndices = rerankedResponse.results.map(r => r.index); // cohere docs: index is from input docs array (highSimilarityChunks)
-					medalsNameInDb = rankedIndices.map(idx => highSimilarityChunks[idx].name_in_db);
-
-					// 2. Gather all chunks (from results.chunks) that share each name_in_db, in order, no duplicates in order
-					const foundChunksByMedals = [];
-
-					medalsNameInDb.forEach(nameInDb => {
-						const matchingChunks = results.chunks.filter(chunk => chunk.name_in_db === nameInDb);
-						foundChunksByMedals.push(...matchingChunks);
-					});
-
-					// foundChunksByMedals now has all the chunks for 'gold' doc, then 'silver', then 'bronze'
+					// rerankedResponse now has all the chunks for 'gold' doc, then 'silver', then 'bronze'
 					// If you want to remove duplicates (in content), you can apply further filtering
 
-					results.topRankedDocs = foundChunksByMedals;
-					allParagraphsFoundConcat=foundChunksByMedals.map(item => item.content).join(' ');
-				} catch (error) {
-					results.generalMsg="Error reranking with Cohere:", error.message;
-					// Continue without reranking if error occurs
+					
+				results.topRankedDocs = rerankedResponse.results.map(item => results.chunks[item.index]);
+				results.uniqueNameInDb = [...new Set(results.topRankedDocs.map(item => item.name_in_db))];
+				allParagraphsFoundConcat=""
+				
+				// return all chunks of top ranked docs
+				const { data, error } = await supabase.rpc('return_chunks_by_name_in_db', {
+					p_names_in_db: results.uniqueNameInDb.join(',')
+				});
+				if (error) {
+					results.errorChunksByName = JSON.stringify({
+						message: error.message,
+						details: error.details,
+						hint: error.hint,
+						code: error.code
+					});
+				} else {
+					results.chunks = data.map(item => {return {content:item.content,name_in_db:item.name_in_db,similarity:item.similarity,doc_name:item.doc_name};});
+					allParagraphsFoundConcat=data.map(item => item.content).join(' ');
+				}
+			} catch (error) {
+				results.generalMsg="Error reranking with Cohere:", error.message;
+				// Continue without reranking if error occurs
+			}
+			finally {
+				if (toIncludeTimes) {
+					results.timeStamps.after_reranking = Date.now();
 				}
 			}
 		}
-		
-		const EXPERT_PROMPT = `אתה מומחה מוביל ביחסי עבודה ודיני עבודה בישראל.
+	}
+	
+	const EXPERT_PROMPT = `אתה מומחה מוביל ביחסי עבודה ודיני עבודה בישראל.
 
 			הוראות עבודה:
 
@@ -369,16 +384,20 @@ export default {
 			{ role: 'user', content: `שאלה: '${oNewQuery.question}'`} 
 		];
 
-		if (bIncludeLog){
-			results.log+=" before calling openai with query and data. date is - "+new Date().toISOString();
-		}
+	if (bIncludeLog){
+		results.log+=" before calling openai with query and data. date is - "+new Date().toISOString();
+	}
 
-		const stream = new ReadableStream({
-			async start(controller) {
-			  const encoder = new TextEncoder();
-			  try {
-				// Call OpenAI with stream:true.
-				const chatCompletion = await oOpenAi.chat.completions.create({
+	const stream = new ReadableStream({
+		async start(controller) {
+		  const encoder = new TextEncoder();
+		  try {
+			if (toIncludeTimes) {
+				results.timeStamps.before_openai_stream = Date.now();
+			}
+			
+			// Call OpenAI with stream:true.
+			const chatCompletion = await oOpenAi.chat.completions.create({
 				  model: parseInt(oNewQuery.type)===1 ? "gpt-4.1" : "gpt-4.1-mini",
 				  messages: messagesForOpenAI,
 				  temperature:0,
@@ -418,18 +437,54 @@ export default {
 					}
 				}
 				
-				arSources.push("111"+"*%*"+oNewQuery.question+"^^^"+oNewQuery.type+"^^^"+(parseInt(oNewQuery.type)===1 ? "gpt-4.1" : "gpt-4.1-mini")+"^^^"+sModel+
-					(rankedIndices.length>0 ? "^^^ rankedindices="+rankedIndices.join("***") : "")   +
-					(medalsNameInDb.length>0 ? "^^^ medalsnameindb="+medalsNameInDb.join("***") : "")
-				);
+			if (toIncludeTimes) {
+				results.timeStamps.after_streaming = Date.now();
+			}
 
-//				arSources.push("222"+"*%*"+"length123="+highSimilarityChunks.length+" ^^^ "+ "generalMsg="+results.generalMsg);
-
-				if (arSources.length>0){
-					controller.enqueue(encoder.encode(`*^*${arSources.join("*&*")}`));
+			// Calculate and format durations
+			let timesString = "";
+			if (toIncludeTimes && results.timeStamps.start) {
+				const ts = results.timeStamps;
+				const durations = [];
+				
+				if (ts.start && ts.after_rewrite) {
+					durations.push(`rewrite=${ts.after_rewrite - ts.start}ms`);
 				}
+				if (ts.after_rewrite && ts.after_embedding) {
+					durations.push(`embed=${ts.after_embedding - ts.after_rewrite}ms`);
+				}
+				if (ts.after_embedding && ts.after_supabase) {
+					durations.push(`supabase=${ts.after_supabase - ts.after_embedding}ms`);
+				}
+				if (ts.after_reranking && ts.after_supabase) {
+					durations.push(`rerank=${ts.after_reranking - ts.after_supabase}ms`);
+				}
+				const beforeStream = ts.after_reranking || ts.after_supabase;
+				if (beforeStream && ts.before_openai_stream) {
+					durations.push(`openai=${ts.before_openai_stream - beforeStream}ms`);
+				}
+				if (ts.before_openai_stream && ts.after_streaming) {
+					durations.push(`stream=${ts.after_streaming - ts.before_openai_stream}ms`);
+				}
+				
+				if (durations.length > 0) {
+					timesString = "^^^ times: " + durations.join(",");
+				}
+			}
 
-				controller.close();
+			arSources.push("111"+"*%*"+oNewQuery.question+"^^^"+oNewQuery.type+"^^^"+(parseInt(oNewQuery.type)===1 ? "gpt-4.1" : "gpt-4.1-mini")+"^^^"+sModel+
+				(results.uniqueNameInDb && Array.isArray(results.uniqueNameInDb) && results.uniqueNameInDb.length>0 ? "^^^ uniqueNameInDb="+results.uniqueNameInDb.join(",") : "") + 
+				(results.errorChunksByName ? "^^^ errorChunksByName="+results.errorChunksByName : "") +
+				timesString
+			);
+
+//				arSources.push("222"+"*%*"+"length123="+results.chunks.length+" ^^^ "+ "generalMsg="+results.generalMsg);
+
+			if (arSources.length>0){
+				controller.enqueue(encoder.encode(`*^*${arSources.join("*&*")}`));
+			}
+
+			controller.close();
 			  } catch (error) {
 				// If there's an error, report it and signal failure.
 				console.error("Error during OpenAI streaming:", error);
