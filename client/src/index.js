@@ -68,11 +68,11 @@ export default {
 				break;
 			case "4"://cohere
 				sModel="cohere";
-				sMatchFunction="match_documents_new_cohere";
+				sMatchFunction="match_documents_new_cohere_400_with_relevant_chunks_emphasized";
 				break;
 			case "5"://cohere_1000
 				sModel="cohere_1000";
-				sMatchFunction="match_documents_new_cohere_1000";
+				sMatchFunction="match_documents_new_cohere_1000_with_relevant_chunks_emphasized";
 				break;
 			default:
 				sModel="openai-text-embedding-3-large";
@@ -95,17 +95,34 @@ export default {
 
 		if (1==1){
 
-			const PROMPT_REWRITE = `אתה מומחה ליחסי עבודה ושכר בישראל. עליך לבצע שתי משימות:
-שכתוב שאלה: שכתב את השאלה שתקבל כך שתהיה ברורה, ספציפית ומכילה את כל הפרטים הרלוונטיים הדרושים למתן תשובה מדויקת ומלאה. ודא שהשאלה כוללת הקשר משפטי וחוקי מתאים.
-אם השאלה כמותית אנא נסח את השאלה כך שתבהיר לבינה המלאכותית שעליה להשתמש בחישובים המתאימים כדי להגיע לתשובה ושעליה לפרט את החישובים שעשתה
-2. ציין את סוג השאלה: 
-האם זו שאלה כמותית - אם התשובה היא מספר, אחוז, סכום כסף או תחשיב מדויק
-האם זו שאלה איכותיח - אם התשובה היא הסבר, הנחיות או ניתוח משפטי.
-החזר JSON עם שני משתנים:
-1. quesion - תוכן השאלה המשוכתבת כפי שהיא בלי הקדמות או סיומות
-2. type: 
-אם זו שאלה איכותית החזר 0. 
-אם זו שאלה כמותית החזר 1
+			const PROMPT_REWRITE = `אתה מומחה ליחסי עבודה ושכר בישראל. תפקידך לנרמל שאלות משתמש לפורמט אחיד.
+הוראות קריטיות:
+1. התעלם לחלוטין ממילות נימוס, ברכות או פתיחות (שלום, תודה, בבקשה וכו')
+2. חלץ רק את ליבת השאלה המשפטית
+3. שמור על המבנה הבא בדיוק:
+
+עבור כל שאלה, זהה:
+- הנושא המשפטי המרכזי
+- העובדות הספציפיות (סכומים, תקופות, סטטוס עובד)
+- השאלה המשפטית המדויקת
+
+תבנית השאלה המנורמלת:
+"בהתאם ל[חוק רלוונטי], [שאלה משפטית ספציפית]? [אם יש תנאים מיוחדים - הוסף: במקרה של [תנאי], האם יש שינוי?]"
+
+כללים נוספים:
+- אם השאלה כמותית אז היא דורשת חישוב. במקרה הזה הוסף: "יש לבצע חישוב מפורט ולהציג את שלבי החישוב"
+- אל תוסיף בקשות כלליות כמו "פרט את ההקשר" או "הסבר את הזכויות והחובות" אלא אם המשתמש ביקש זאת במפורש
+- שמור על אורך שאלה מינימלי - אל תרחיב מעבר להכרחי
+
+סוג השאלה:
+- כמותית (1): התשובה היא מספר, אחוז, סכום או תחשיב
+- איכותית (0): התשובה היא הסבר משפטי או הנחיות
+
+פורמט פלט - JSON בלבד:
+{
+  "question": "[השאלה המנורמלת]",
+  "type": 0 או 1
+}
 `;
 			//here call openai to transform your query to a more structured query
 			messagesForOpenAI = [
@@ -248,7 +265,7 @@ export default {
 		const { data,error } = await supabase.rpc(sMatchDocumentsFunction, {
 			query_embedding: messages.vector,
 			match_threshold: 0.5,
-			match_count: 10,
+			match_count: 30,
 			p_dt:queryDate,
 		});
 		if (bIncludeLog){
@@ -262,10 +279,60 @@ export default {
 		let allParagraphsFoundConcat="";
 
 		if (data) {
-			results.chunks = data.map(item => {return {content:item.content,name_in_db:item.name_in_db,similarity:item.similarity,doc_name:item.doc_name};});
-			allParagraphsFoundConcat=data.map(item => item.content).join(' ')
+			results.chunks = data.map(item => {return {content:item.content,name_in_db:item.name_in_db,similarity:item.similarity,doc_name:item.doc_name,is_high_similarity:item.is_high_similarity};});
+			allParagraphsFoundConcat=data.map(item => item.content).join(' ');
 		}
 
+		results.generalMsg="";
+		results.highSimilarityNamesInDb=[];
+		let rankedIndices = [];
+		let medalsNameInDb = [];
+		let highSimilarityChunks = [];
+		// Rerank high similarity chunks using Cohere
+		if (sModel.includes("cohere") && results.chunks && Array.isArray(results.chunks)) {
+			
+			
+			// Add name_in_db of high similarity chunks to results.highSimilarityNamesInDb
+			highSimilarityChunks = results.chunks.filter(chunk => chunk.is_high_similarity == 1);
+			results.highSimilarityNamesInDb = highSimilarityChunks
+				.map(chunk => chunk.name_in_db);
+
+			if (highSimilarityChunks.length > 0) {
+				try {
+					const rerankedResponse = await oCohere.rerank({
+						query: oNewQuery.question,
+						documents: highSimilarityChunks.map(chunk => chunk.content),
+						model: "rerank-multilingual-v3.0",
+						topN: 5 /*highSimilarityChunks.length // Return all reranked*/
+					});
+					// rerankedResponse contains the reranked results, i.e. rerankedResponse.results is an array of {index, relevanceScore}
+					// We want to extract the top 3 ranked chunks according to cohere's rerank response.
+					// Then, collect all chunks (from results.chunks) that share the name_in_db property with each of the 3, maintaining order (gold, silver, bronze).
+
+					// 1. Get name_in_db for each of the 3 ranked chunks, in order (gold, silver, bronze)
+					rankedIndices = rerankedResponse.results.map(r => r.index); // cohere docs: index is from input docs array (highSimilarityChunks)
+					medalsNameInDb = rankedIndices.map(idx => highSimilarityChunks[idx].name_in_db);
+
+					// 2. Gather all chunks (from results.chunks) that share each name_in_db, in order, no duplicates in order
+					const foundChunksByMedals = [];
+
+					medalsNameInDb.forEach(nameInDb => {
+						const matchingChunks = results.chunks.filter(chunk => chunk.name_in_db === nameInDb);
+						foundChunksByMedals.push(...matchingChunks);
+					});
+
+					// foundChunksByMedals now has all the chunks for 'gold' doc, then 'silver', then 'bronze'
+					// If you want to remove duplicates (in content), you can apply further filtering
+
+					results.topRankedDocs = foundChunksByMedals;
+					allParagraphsFoundConcat=foundChunksByMedals.map(item => item.content).join(' ');
+				} catch (error) {
+					results.generalMsg="Error reranking with Cohere:", error.message;
+					// Continue without reranking if error occurs
+				}
+			}
+		}
+		
 		const EXPERT_PROMPT = `אתה מומחה מוביל ביחסי עבודה ודיני עבודה בישראל.
 
 			הוראות עבודה:
@@ -339,8 +406,9 @@ export default {
 
 
 				let arSources = [];
-				if (results.chunks && Array.isArray(results.chunks)) {
-					for (const chunk of results.chunks) {
+				const arChunks=results.topRankedDocs || results.chunks;
+				if (arChunks && Array.isArray(arChunks)) {
+					for (const chunk of arChunks) {
 						// INSERT_YOUR_CODE
 						// Check if chunk.name_in_db is present in any of the arSources strings
 						const isNameInSources = arSources.some(src => src.includes(chunk.doc_name));
@@ -349,7 +417,14 @@ export default {
 						}
 					}
 				}
-				arSources.push("111"+"*%*"+oNewQuery.question+"^^^"+oNewQuery.type+"^^^"+(parseInt(oNewQuery.type)===1 ? "gpt-4.1" : "gpt-4.1-mini")+"^^^"+sModel);
+				
+				arSources.push("111"+"*%*"+oNewQuery.question+"^^^"+oNewQuery.type+"^^^"+(parseInt(oNewQuery.type)===1 ? "gpt-4.1" : "gpt-4.1-mini")+"^^^"+sModel+
+					(rankedIndices.length>0 ? "^^^ rankedindices="+rankedIndices.join("***") : "")   +
+					(medalsNameInDb.length>0 ? "^^^ medalsnameindb="+medalsNameInDb.join("***") : "")
+				);
+
+//				arSources.push("222"+"*%*"+"length123="+highSimilarityChunks.length+" ^^^ "+ "generalMsg="+results.generalMsg);
+
 				if (arSources.length>0){
 					controller.enqueue(encoder.encode(`*^*${arSources.join("*&*")}`));
 				}
