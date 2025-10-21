@@ -472,7 +472,7 @@ export default {
 				}
 			}
 
-			arSources.push("111"+"*%*"+oNewQuery.question+"^^^"+oNewQuery.type+"^^^"+(parseInt(oNewQuery.type)===1 ? "gpt-4.1" : "gpt-4.1-mini")+"^^^"+sModel+
+			arSources.push("metadata_for_debug"+"*%*"+oNewQuery.question+"^^^"+oNewQuery.type+"^^^"+(parseInt(oNewQuery.type)===1 ? "gpt-4.1" : "gpt-4.1-mini")+"^^^"+sModel+
 				(results.uniqueNameInDb && Array.isArray(results.uniqueNameInDb) && results.uniqueNameInDb.length>0 ? "^^^ uniqueNameInDb="+results.uniqueNameInDb.join(",") : "") + 
 				(results.errorChunksByName ? "^^^ errorChunksByName="+results.errorChunksByName : "") +
 				timesString
