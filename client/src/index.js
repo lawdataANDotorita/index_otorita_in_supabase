@@ -72,7 +72,7 @@ export default {
 				break;
 			case "4"://cohere
 				sModel="cohere";
-				sMatchFunction="match_documents_new_cohere_400";
+				sMatchFunction="return_most_similar_chunks_only_cohere_400";
 				break;
 			case "5"://cohere_1000
 				sModel="cohere_1000";
@@ -304,7 +304,7 @@ export default {
 		}
 
 		results.generalMsg="";
-		if (sModel.includes("cohere_1000") && results.chunks && Array.isArray(results.chunks)) {
+		if (sModel.includes("cohere") && results.chunks && Array.isArray(results.chunks)) {
 			if (results.chunks.length > 0) {
 				try {
 					const rerankedResponse = await oCohere.rerank({
@@ -322,7 +322,10 @@ export default {
 				allParagraphsFoundConcat=""
 				
 				// return all chunks of top ranked docs
-				const { data, error } = await supabase.rpc('return_chunks_by_name_in_db', {
+
+				const sReturnChunksByNameFunction=sModel==="cohere_1000" ? "return_chunks_by_name_in_db_cohere_1000" : "return_chunks_by_name_in_db_cohere_400";
+
+				const { data, error } = await supabase.rpc(sReturnChunksByNameFunction, {
 					p_names_in_db: results.uniqueNameInDb.join(',')
 				});
 				if (error) {
