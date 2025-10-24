@@ -43,16 +43,18 @@ export default {
 		const oCohere = new CohereClient({
 			token: env.COHERE_API_KEY
 		});
-	var messagesForOpenAI;
-	var response;
-	var chatCompletion;
-	const results={};
-	var bIncludeLog=false;
-	const toIncludeTimes = true; // Set to true to track execution times
-	if (toIncludeTimes) {
-		results.timeStamps = {};
-	}
 
+		var messagesForOpenAI;
+		var response;
+		var chatCompletion;
+		const results={};
+		var bIncludeLog=false;
+		const toIncludeTimes = true; // Set to true to track execution times
+		if (toIncludeTimes) {
+			results.timeStamps = {};
+		}
+		const docScores = {};
+		var rerankedResponse={};
 
 		let sModel="";
 		let sMatchFunction="";
@@ -281,7 +283,7 @@ export default {
 		const { data,error } = await supabase.rpc(sMatchDocumentsFunction, {
 			query_embedding: messages.vector,
 			match_threshold: 0.5,
-			match_count: 30,
+			match_count: 50,
 			p_dt:queryDate,
 		});
 	if (toIncludeTimes) {
@@ -307,17 +309,43 @@ export default {
 		if (sModel.includes("cohere") && results.chunks && Array.isArray(results.chunks)) {
 			if (results.chunks.length > 0) {
 				try {
-					const rerankedResponse = await oCohere.rerank({
+					rerankedResponse = await oCohere.rerank({
 						query: oNewQuery.question,
 						documents: 	results.chunks.map(chunk => chunk.content),
 						model: "rerank-multilingual-v3.0",
-						topN: 5 /*results.chunks.length // Return all reranked*/
+						topN: results.chunks.length // Return all reranked
 					});
 					// rerankedResponse now has all the chunks for 'gold' doc, then 'silver', then 'bronze'
 					// If you want to remove duplicates (in content), you can apply further filtering
 
 					
-				results.topRankedDocs = rerankedResponse.results.map(item => results.chunks[item.index]);
+
+					
+				results.chunksRanked = rerankedResponse.results.map(item => {
+					return {
+						...results.chunks[item.index],
+						score:item.relevanceScore || 0
+					}
+				});
+				
+
+				// Calculate aggregated scores by document
+				for (const chunk of results.chunksRanked) {
+					const name_in_db = chunk.name_in_db;
+					const doc_name = chunk.doc_name;
+					const score = chunk.score || 0;
+					if (!docScores[name_in_db]) {
+						docScores[name_in_db] = {doc_name:doc_name,score:0};
+					}
+					docScores[name_in_db].score += score;
+				}
+
+				// Only keep the top 5 name_in_db by highest aggregated relevance_score
+				results.topRankedDocs = Object.entries(docScores)
+					.sort((a, b) => b[1].score - a[1].score)
+					.slice(0, 5)
+					.map(([name_in_db, obj]) => ({name_in_db, doc_name: obj.doc_name, score: obj.score}));
+
 				results.uniqueNameInDb = [...new Set(results.topRankedDocs.map(item => item.name_in_db))];
 				allParagraphsFoundConcat=""
 				
@@ -428,14 +456,14 @@ export default {
 
 
 				let arSources = [];
-				const arChunks=results.topRankedDocs || results.chunks;
-				if (arChunks && Array.isArray(arChunks)) {
-					for (const chunk of arChunks) {
+				const arMostRelevantDocs=results.topRankedDocs || results.chunks;
+				if (arMostRelevantDocs && Array.isArray(arMostRelevantDocs)) {
+					for (const item of arMostRelevantDocs) {
 						// INSERT_YOUR_CODE
 						// Check if chunk.name_in_db is present in any of the arSources strings
-						const isNameInSources = arSources.some(src => src.includes(chunk.doc_name));
-						if (chunk.doc_name && !isNameInSources) {
-							arSources.push(chunk.name_in_db+"*%*"+chunk.doc_name);
+						const isNameInSources = arSources.some(src => src.includes(item.doc_name));
+						if (item.doc_name && !isNameInSources) {
+							arSources.push(item.name_in_db+"*%*"+item.doc_name);
 						}
 					}
 				}
@@ -478,7 +506,10 @@ export default {
 			arSources.push("metadata_for_debug"+"*%*"+oNewQuery.question+"^^^"+oNewQuery.type+"^^^"+(parseInt(oNewQuery.type)===1 ? "gpt-4.1" : "gpt-4.1-mini")+"^^^"+sModel+
 				(results.uniqueNameInDb && Array.isArray(results.uniqueNameInDb) && results.uniqueNameInDb.length>0 ? "^^^ uniqueNameInDb="+results.uniqueNameInDb.join(",") : "") + 
 				(results.errorChunksByName ? "^^^ errorChunksByName="+results.errorChunksByName : "") +
-				timesString
+				" ^^^ docScores="+JSON.stringify(docScores) +
+				" ^^^ rerankedResponse="+JSON.stringify(rerankedResponse) +
+				" ^^^ chunks length="+results.chunks.length + 
+				" ^^^ " + timesString
 			);
 
 //				arSources.push("222"+"*%*"+"length123="+results.chunks.length+" ^^^ "+ "generalMsg="+results.generalMsg);
