@@ -58,6 +58,7 @@ export default {
 
 		let sModel="";
 		let sMatchFunction="";
+		let iChunksLength=0;
 
 		switch (messages.model) {
 			case "1"://voyage-multilingual-2
@@ -106,41 +107,41 @@ export default {
 	if (1==1){
 
 		const PROMPT_REWRITE = `אתה מומחה ליחסי עבודה ושכר בישראל. תפקידך לנרמל שאלות משתמש לפורמט אחיד.
-הוראות קריטיות:
-1. התעלם לחלוטין ממילות נימוס, ברכות או פתיחות (שלום, תודה, בבקשה וכו')
-2. חלץ רק את ליבת השאלה המשפטית
-3. שמור על המבנה הבא בדיוק:
-
-עבור כל שאלה, זהה:
-- הנושא המשפטי המרכזי
-- העובדות הספציפיות (סכומים, תקופות, סטטוס עובד)
-- השאלה המשפטית המדויקת
-
-תבנית השאלה המנורמלת:
-"בהתאם ל[חוק רלוונטי], [שאלה משפטית ספציפית]? [אם יש תנאים מיוחדים - הוסף: במקרה של [תנאי], האם יש שינוי?]"
-
-כללים נוספים:
-- אם השאלה כמותית אז היא דורשת חישוב. במקרה הזה הוסף: "יש לבצע חישוב מפורט ולהציג את שלבי החישוב"
-- אל תוסיף בקשות כלליות כמו "פרט את ההקשר" או "הסבר את הזכויות והחובות" אלא אם המשתמש ביקש זאת במפורש
-- שמור על אורך שאלה מינימלי - אל תרחיב מעבר להכרחי
-
-סוג השאלה:
-- כמותית (1): התשובה היא מספר, אחוז, סכום או תחשיב
-- איכותית (0): התשובה היא הסבר משפטי או הנחיות
-
-פורמט פלט - JSON בלבד:
-{
-  "question": "[השאלה המנורמלת]",
-  "type": 0 או 1
-}
-`;
-			//here call openai to transform your query to a more structured query
+		הוראות קריטיות:
+		1. התעלם לחלוטין ממילות נימוס, ברכות או פתיחות (שלום, תודה, בבקשה וכו')
+		2. חלץ רק את ליבת השאלה המשפטית
+		3. שמור על המבנה הבא בדיוק:
+		
+		עבור כל שאלה, זהה:
+		- הנושא המשפטי המרכזי
+		- העובדות הספציפיות (סכומים, תקופות, סטטוס עובד)
+		- השאלה המשפטית המדויקת
+		
+		תבנית השאלה המנורמלת:
+		"בהתאם ל[חוק רלוונטי אם ישנו כזה. אל תכריח], [שאלה משפטית ספציפית]? [אם יש תנאים מיוחדים - הוסף: במקרה של [תנאי], האם יש שינוי?]"
+		
+		כללים נוספים:
+		- אם השאלה כמותית אז היא דורשת חישוב. במקרה הזה הוסף: "יש לבצע חישוב מפורט ולהציג את שלבי החישוב"
+		- אל תוסיף בקשות כלליות כמו "פרט את ההקשר" או "הסבר את הזכויות והחובות" אלא אם המשתמש ביקש זאת במפורש
+		- שמור על אורך שאלה מינימלי - אל תרחיב מעבר להכרחי
+		
+		סוג השאלה:
+		- כמותית (1): התשובה היא מספר, אחוז, סכום או תחשיב
+		- איכותית (0): התשובה היא הסבר משפטי או הנחיות
+		
+		פורמט פלט - JSON בלבד:
+		{
+		  "question": "[השאלה המנורמלת]",
+		  "type": 0 או 1
+		}
+		`;
+					//here call openai to transform your query to a more structured query
 			messagesForOpenAI = [
 				{ role: 'system', content: PROMPT_REWRITE},
 				{ role: 'user', content: messages.query }
 			];
 			chatCompletion = await oOpenAi.chat.completions.create({
-				model: 'gpt-4.1-mini',
+				model: 'gpt-4.1',
 				messages:messagesForOpenAI,
 				temperature: 0,
 				presence_penalty: 0,
@@ -280,9 +281,10 @@ export default {
 
 
 		const sMatchDocumentsFunction=messages.history!==undefined ? sMatchFunction : "match_documents_test";
+		const iMatchThreshhold=0.5;
 		const { data,error } = await supabase.rpc(sMatchDocumentsFunction, {
 			query_embedding: messages.vector,
-			match_threshold: 0.5,
+			match_threshold: iMatchThreshhold,
 			match_count: 50,
 			p_dt:queryDate,
 		});
@@ -301,10 +303,11 @@ export default {
 		let allParagraphsFoundConcat="";
 
 		if (data) {
-			results.chunks = data.map(item => {return {content:item.content,name_in_db:item.name_in_db,similarity:item.similarity,doc_name:item.doc_name};});
-			allParagraphsFoundConcat=data.map(item => item.content).join(' ');
+			const filteredData = data.filter(item => item.similarity >= iMatchThreshhold);
+			results.chunks = filteredData.map(item => {return {content:item.content,name_in_db:item.name_in_db,similarity:item.similarity,doc_name:item.doc_name};});
+			allParagraphsFoundConcat=results.chunks.map(item => item.content).join(' ');
 		}
-
+		iChunksLength=data.length;
 		results.generalMsg="";
 		if (sModel.includes("cohere") && results.chunks && Array.isArray(results.chunks)) {
 			if (results.chunks.length > 0) {
@@ -319,9 +322,8 @@ export default {
 					// If you want to remove duplicates (in content), you can apply further filtering
 
 					
-
-					
-				results.chunksRanked = rerankedResponse.results.map(item => {
+				const filteredRerankedResponse=rerankedResponse.results.filter(item => item.relevanceScore >= 0.5);
+				results.chunksRanked = filteredRerankedResponse.map(item => {
 					return {
 						...results.chunks[item.index],
 						score:item.relevanceScore || 0
@@ -508,7 +510,7 @@ export default {
 				(results.errorChunksByName ? "^^^ errorChunksByName="+results.errorChunksByName : "") +
 				" ^^^ docScores="+JSON.stringify(docScores) +
 				" ^^^ rerankedResponse="+JSON.stringify(rerankedResponse) +
-				" ^^^ chunks length="+results.chunks.length + 
+				" ^^^ data chunks length="+iChunksLength +
 				" ^^^ " + timesString
 			);
 
