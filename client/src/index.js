@@ -281,10 +281,9 @@ export default {
 
 
 		const sMatchDocumentsFunction=messages.history!==undefined ? sMatchFunction : "match_documents_test";
-		const iMatchThreshhold=0.5;
 		const { data,error } = await supabase.rpc(sMatchDocumentsFunction, {
 			query_embedding: messages.vector,
-			match_threshold: iMatchThreshhold,
+			match_threshold: 0.5,
 			match_count: 50,
 			p_dt:queryDate,
 		});
@@ -303,35 +302,84 @@ export default {
 		let allParagraphsFoundConcat="";
 
 		if (data) {
-			const filteredData = data.filter(item => item.similarity >= iMatchThreshhold);
+			/*
+			  this one filters out the chunks that are not relevant to the query. 
+			  i use lower threshhold to remove only the real unrelevant chunks. 
+			  but we should take into accout the possibility that something will be 
+			  less similar but more relevant
+			*/
+			const filteredData = data.filter(item => item.similarity >= 0.3);
 			results.chunks = filteredData.map(item => {return {content:item.content,name_in_db:item.name_in_db,similarity:item.similarity,doc_name:item.doc_name};});
+			
+			
+			results.chunks = data.map(item => {return {content:item.content,name_in_db:item.name_in_db,similarity:item.similarity,doc_name:item.doc_name};});
 			allParagraphsFoundConcat=results.chunks.map(item => item.content).join(' ');
 		}
 		iChunksLength=data.length;
 		results.generalMsg="";
 		if (sModel.includes("cohere") && results.chunks && Array.isArray(results.chunks)) {
 			if (results.chunks.length > 0) {
+				
+				/* we want to send to rerank a list of pseudo documents. by that i mean the each pseudo document will contain all the chunks returned from the database that share the same name_in_db. between each chunk there will be a separator consisting of newline and "===" and newline.
+				here is an example of a pseudo document:
+				===
+				chunk 1
+				===
+				chunk 2
+				===
+				chunk 3
+				===
+				chunk 4
+				*/
+				// Group the chunks by 'name_in_db' (i.e., doc), and for each group,
+				// concatenate the chunk contents, separated by "\n===\n", in original order.
+				const pseudoDocuments = [];
+				const docGroups = {};
+
+				for (const chunk of results.chunks) {
+					if (!docGroups[chunk.name_in_db]) {
+						docGroups[chunk.name_in_db] = {arContent:[], name_in_db: chunk.name_in_db, doc_name: chunk.doc_name};
+					}
+					docGroups[chunk.name_in_db].arContent.push(chunk.content);
+				}
+				
+				// Compose pseudo documents in order, preserving index order of chunks within docs
+				const docOrder = Object.keys(docGroups); // No sort, preserve insertion
+				for (const doc of docOrder) {
+					// sort chunks as in returned order if needed, but already preserved
+					const sContent = docGroups[doc].arContent.join('\n===\n');
+					const pseudoDoc = {content: sContent, name_in_db: docGroups[doc].name_in_db, doc_name: docGroups[doc].doc_name};
+					pseudoDocuments.push(pseudoDoc);
+				}
+				// The pseudoDocuments array can now be used for reranking, e.g.:
+				// rerankedResponse = await oCohere.rerank({
+				//     query: oNewQuery.question,
+				//     documents: pseudoDocuments,
+				//     ...
+				// });
+
+				
+				
 				try {
 					rerankedResponse = await oCohere.rerank({
 						query: oNewQuery.question,
-						documents: 	results.chunks.map(chunk => chunk.content),
+						documents: 	pseudoDocuments.map(doc => doc.content),
 						model: "rerank-multilingual-v3.0",
-						topN: results.chunks.length // Return all reranked
+						topN: pseudoDocuments.length // Return all reranked
 					});
-					// rerankedResponse now has all the chunks for 'gold' doc, then 'silver', then 'bronze'
-					// If you want to remove duplicates (in content), you can apply further filtering
 
 					
 				const filteredRerankedResponse=rerankedResponse.results.filter(item => item.relevanceScore >= 0.5);
-				results.chunksRanked = filteredRerankedResponse.map(item => {
+				results.pseudoDocsRanked = filteredRerankedResponse.map(item => {
 					return {
-						...results.chunks[item.index],
+						...pseudoDocuments[item.index],
 						score:item.relevanceScore || 0
 					}
 				});
 				
 
 				// Calculate aggregated scores by document
+/*
 				for (const chunk of results.chunksRanked) {
 					const name_in_db = chunk.name_in_db;
 					const doc_name = chunk.doc_name;
@@ -341,18 +389,14 @@ export default {
 					}
 					docScores[name_in_db].score += score;
 				}
-
+*/
 				// Only keep the top 5 name_in_db by highest aggregated relevance_score
-				results.topRankedDocs = Object.entries(docScores)
-					.sort((a, b) => b[1].score - a[1].score)
-					.slice(0, 5)
-					.map(([name_in_db, obj]) => ({name_in_db, doc_name: obj.doc_name, score: obj.score}));
-
+				results.topRankedDocs = results.pseudoDocsRanked.slice(0, 5);
 				results.uniqueNameInDb = [...new Set(results.topRankedDocs.map(item => item.name_in_db))];
 				allParagraphsFoundConcat=""
-				
-				// return all chunks of top ranked docs
 
+
+				
 				const sReturnChunksByNameFunction=sModel==="cohere_1000" ? "return_chunks_by_name_in_db_cohere_1000" : "return_chunks_by_name_in_db_cohere_400";
 
 				const { data, error } = await supabase.rpc(sReturnChunksByNameFunction, {
