@@ -93,12 +93,12 @@ export default {
 			for (const item of arHistory) {
 				if (item.role === "user" && typeof item.content === "string") {
 					// Add a newline and then the content to newQuery
-					newQuery += "\n" + item.content;
+					newQuery += "\n\מ\מ" + "שאלה: "+item.content;
 				}
 			}
 		}
 		
-	newQuery +=!!newQuery ? ("\n"+messages.query) : messages.query;
+	newQuery +=!!newQuery ? ("\n\n\n" + "שאלה: " + messages.query) : "שאלה: " + messages.query;
 
 	if (toIncludeTimes) {
 		results.timeStamps.start = Date.now();
@@ -110,9 +110,16 @@ export default {
 		הוראות קריטיות:
 		1. התעלם לחלוטין ממילות נימוס, ברכות או פתיחות (שלום, תודה, בבקשה וכו')
 		2. חלץ רק את ליבת השאלה המשפטית
-		3. שמור על המבנה הבא בדיוק:
-		
-		עבור כל שאלה, זהה:
+		3. אם מופיעה יותר משאלה אחת אז השאלה הרלוונטית היא רק השאלה האחרונה, אבל ההקשר שלה צריך להיות השאלות הקודמות.
+		למשל:
+		שאלה: מה הדרך לחשב מס הכנסה ?
+		שאלה: יש דרך אחרת ?
+
+		אז השאלה המעודכנת צריכה להיות: האפ יש דרך אחרת מלבד הדרך הרגילה לחשב מס הכנסה ?
+
+		4. שמור על המבנה הבא בדיוק:
+				
+		השאלה צריכה להכיל:
 		- הנושא המשפטי המרכזי
 		- העובדות הספציפיות (סכומים, תקופות, סטטוס עובד)
 		- השאלה המשפטית המדויקת
@@ -138,7 +145,7 @@ export default {
 					//here call openai to transform your query to a more structured query
 			messagesForOpenAI = [
 				{ role: 'system', content: PROMPT_REWRITE},
-				{ role: 'user', content: messages.query }
+				{ role: 'user', content: newQuery }
 			];
 			chatCompletion = await oOpenAi.chat.completions.create({
 				model: 'gpt-4.1',
