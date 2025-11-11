@@ -318,8 +318,6 @@ export default {
 			const filteredData = data.filter(item => item.similarity >= 0.3);
 			results.chunks = filteredData.map(item => {return {content:item.content,name_in_db:item.name_in_db,similarity:item.similarity,doc_name:item.doc_name};});
 			
-			
-			results.chunks = data.map(item => {return {content:item.content,name_in_db:item.name_in_db,similarity:item.similarity,doc_name:item.doc_name};});
 			allParagraphsFoundConcat=results.chunks.map(item => item.content).join(' ');
 		}
 		iChunksLength=data.length;
@@ -556,14 +554,8 @@ export default {
 				}
 			}
 
-			arSources.push("metadata_for_debug"+"*%*"+oNewQuery.question+"^^^"+oNewQuery.type+"^^^"+(parseInt(oNewQuery.type)===1 ? "gpt-4.1" : "gpt-4.1-mini")+"^^^"+sModel+
-				(results.uniqueNameInDb && Array.isArray(results.uniqueNameInDb) && results.uniqueNameInDb.length>0 ? "^^^ uniqueNameInDb="+results.uniqueNameInDb.join(",") : "") + 
-				(results.errorChunksByName ? "^^^ errorChunksByName="+results.errorChunksByName : "") +
-				" ^^^ docScores="+JSON.stringify(docScores) +
-				" ^^^ rerankedResponse="+JSON.stringify(rerankedResponse) +
-				" ^^^ data chunks length="+iChunksLength +
-				" ^^^ " + timesString
-			);
+			arSources.push("metadata_for_debug"+"*%*"+oNewQuery.question+"^^^"+oNewQuery.type+"^^^"+(parseInt(oNewQuery.type)===1 ? "gpt-4.1" : "gpt-4.1-mini")+"^^^"+
+					"model="+sModel);
 
 //				arSources.push("222"+"*%*"+"length123="+results.chunks.length+" ^^^ "+ "generalMsg="+results.generalMsg);
 
