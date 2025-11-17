@@ -9,14 +9,31 @@ import sys
 import requests
 import json
 import cohere
+from typing import Optional
 
-# from langchain.text_splitter import RecursiveCharacterTextSplitter
+YEAR_REGEX = re.compile(r"\b(19[0-9]{2}|20[0-9]{2}|2100)\b")
+
+
+def extract_year_from_doc_name(doc_name: Optional[str]) -> Optional[int]:
+    """
+    Extract a 4-digit year between 1900 and 2100 from doc_name.
+    Returns the year as int if found, otherwise None.
+    """
+    if not doc_name:
+        return None
+
+    match = YEAR_REGEX.search(doc_name)
+    if not match:
+        return None
+
+    year = int(match.group(0))
+    if 1900 <= year <= 2100:
+        return year
+    return None
 
 
 def get_pirsom_data_by_docnm(docNm):
-    return ""
-    """
-    url = "https://otorita.net/otorita_test/getpirsomdatabypirsomnmindb.asp"
+    url = "https://otorita.net/getpirsomdatabypirsomnmindb.asp"
     params = {'docNm': docNm}
     try:
         response = requests.get(url, params=params, timeout=10)
@@ -25,7 +42,7 @@ def get_pirsom_data_by_docnm(docNm):
     except requests.RequestException as e:
         print(f"Error fetching data for docNm '{docNm}': {e}")
         return ""
-    """
+
 # Function to create overlapping chunks
 def create_chunks(words, chunk_size, overlap):
     chunks = []
@@ -199,10 +216,14 @@ for batch_index, file_name in enumerate(files_to_process):
                 chunk["vector"]=get_embedding_cohere(chunk["chunk"])
                 # Only add chunks that have successful embeddings
                 if chunk["vector"] is not None:
+                    doc_name = get_pirsom_data_by_docnm(file_name_clean) 
+                    if doc_name == "":
+                        doc_name = file_name_clean
                     chunks_with_vectors.append({
                         "content": chunk["chunk"],
                         "name_in_db": file_name_clean,
-                        "doc_name": get_pirsom_data_by_docnm(file_name_clean) if get_pirsom_data_by_docnm(file_name_clean) != "" else file_name_clean,
+                        "doc_name": doc_name,
+                        "docyr": extract_year_from_doc_name(doc_name),
                         "embedding": chunk["vector"],
                         "type": "table" if file_name_clean.startswith("tbl") else "article",
                     })
