@@ -60,6 +60,8 @@ export default {
 		let sMatchFunction="";
 		let iChunksLength=0;
 
+		const bExcludeQA = messages.excludeQA =="1";
+
 		switch (messages.model) {
 			case "1"://voyage-multilingual-2
 				sModel="voyage-multilingual-2";
@@ -133,6 +135,7 @@ export default {
 		- שמור על אורך שאלה מינימלי - אל תרחיב מעבר להכרחי
 		- לשאלות על נתונים שמשתנים לאורך זמן (שכר מינימום, מדרגות מס, קצבאות, אחוזי הפרשה וכד') - 
 		הוסף בסוף השאלה: "יש להתייחס לנתון העדכני ביותר מבין המקורות"
+
 		
 		סוג השאלה:
 		- כמותית (1): התשובה היא מספר, אחוז, סכום או תחשיב
@@ -317,9 +320,8 @@ export default {
 			  but we should take into accout the possibility that something will be 
 			  less similar but more relevant
 			*/
-			const filteredData = data.filter(item => item.similarity >= 0.3);
+			const filteredData = data.filter(item => item.similarity >= 0.3 && (bExcludeQA ? item.name_in_db.indexOf("qa") !== 0 : true));
 			results.chunks = filteredData.map(item => {return {content:item.content,name_in_db:item.name_in_db,similarity:item.similarity,doc_name:item.doc_name};});
-			
 			allParagraphsFoundConcat=results.chunks.map(item => item.content).join(' ');
 		}
 		iChunksLength=data.length;
@@ -557,7 +559,8 @@ export default {
 			}
 
 			arSources.push("metadata_for_debug"+"*%*"+oNewQuery.question+"^^^"+oNewQuery.type+"^^^"+(parseInt(oNewQuery.type)===1 ? "gpt-4.1" : "gpt-4.1-mini")+"^^^"+
-					"model="+sModel);
+					sModel+"^^^"+bExcludeQA
+			);
 
 //				arSources.push("222"+"*%*"+"length123="+results.chunks.length+" ^^^ "+ "generalMsg="+results.generalMsg);
 
