@@ -104,9 +104,7 @@ url: str = "https://rmigfbegvrilgentysif.supabase.co"
 key: str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJtaWdmYmVndnJpbGdlbnR5c2lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mjk0MzEwMjMsImV4cCI6MjA0NTAwNzAyM30.S3HRecwWknLROuORA_nfOlizw5VFOeHp01ku3Y8f89M"
 supabase: Client = create_client(url, key)
 
-local_dir: str = r"c:\users\shay\alltmp\query\tmp"
 local_dir: str = r"c:\inetpub\datafax\datafaxdb\pages\query"
-
 
 files_with_times = []
 # Get timestamp from 2 months ago
@@ -127,8 +125,8 @@ for f in os.listdir(local_dir):
         if mod_time >= time_frame:
             files_with_times.append((f, mod_time))
 
-# Sort files by modification time (newest first)
-files_with_times.sort(key=lambda x: x[1], reverse=True)
+# Sort files by modification time (oldest first)
+files_with_times.sort(key=lambda x: x[1], reverse=False)
 
 # Extract just the filenames from files_with_times
 html_and_txt_files = [filename for filename, _ in files_with_times]
@@ -157,8 +155,25 @@ print(f"Files in this batch: {len(files_to_process)}")
 # iterate on the files in this batch
 for batch_index, file_name in enumerate(files_to_process):
     current_file_index = start_index + batch_index
+    
+    # INSERT_YOUR_CODE
+    # Truncate file_name_clean to a maximum of 50 characters if necessary
     file_name_clean = os.path.splitext(file_name)[0]
-#    print(file_name_clean)
+    
+    try:
+        existing = (
+            supabase.table('documents_for_work_world_for_lawyers_cohere')
+            .select('name_in_db')
+            .eq('name_in_db', file_name_clean)
+            .limit(1)
+            .execute()
+        )
+        if existing.data:
+            print(f"Skipping {file_name} - already in DB")
+            save_progress(current_file_index + 1, len(html_and_txt_files), STATE_FILE_PATH)
+            continue
+    except Exception as e:
+        print(f"Error checking existence for {file_name_clean}: {e} - will attempt to process")
 
     to_continue=True
     local_addr=f"{local_dir}\\{file_name}"
@@ -235,22 +250,6 @@ for batch_index, file_name in enumerate(files_to_process):
 
 
         try:
-            
-            # when inserting to new table we don't need to delete existing records
-            if 1 == 1:
-                # Delete existing records with the same name_in_db before inserting new ones
-                try:
-                    delete_response = supabase.table('documents_for_work_world_for_lawyers_cohere').delete().eq('name_in_db', file_name_clean).execute()
-                    if hasattr(delete_response, 'error') and delete_response.error:
-                        print(f"Error deleting existing records: {delete_response.error}")
-                    else:
-                        print(f"Deleted existing records for {file_name_clean}")
-                except Exception as e:
-                    print(f"Error during deletion: {e}")
-
-
-            
-            # Insert data into the document table
             response = supabase.table('documents_for_work_world_for_lawyers_cohere').insert(chunks_with_vectors).execute()
 
             # Check if the response contains errors
